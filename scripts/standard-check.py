@@ -28,6 +28,7 @@ REQUIRED = [
     ".claude/settings.json",
     ".claude/hooks/worktree-guard.mjs",
     ".claude/hooks/push-guard.mjs",
+    ".claude/hooks/design-guard.mjs",   # a no-op without page files; settings.json references it everywhere
     ".claude/commands/go.md",
     ".claude/commands/reset.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
@@ -38,7 +39,7 @@ REQUIRED = [
     ".agents/plans/README.md",
     "qa/README.md",
 ]
-UI_ONLY = [".claude/hooks/design-guard.mjs", ".agents/designs/README.md"]  # required where a UI lives
+UI_ONLY = [".agents/designs/README.md"]  # required where a UI lives
 # Repos that host pages: cvhome (console-ui, landing-ui, uaa-fe), the docs site
 UI_REPOS = {"cvhome", "cvhome-saas.github.io"}
 

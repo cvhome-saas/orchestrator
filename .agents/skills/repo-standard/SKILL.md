@@ -20,7 +20,7 @@ checkout against them; `scripts/standard-apply.sh <repo>` copies what is missing
 | Ship / reset | `.claude/commands/go.md`, `reset.md` | `/go`: commit → verify → push `-u origin HEAD` → `gh pr create` with the template and a label. `/reset`: back to clean `main`, never discarding work unasked |
 | PR shape | `.github/PULL_REQUEST_TEMPLATE.md`, `.github/release.yml`, labels | *Why / What / not obvious / Deviations / Verification*; labels `type/*`, `warn/*`, `ignore-changelog` feed both the release notes and the orchestrator's version bump |
 | QA travels with the code | `qa/<area>-qa.md` (skeleton `qa/README.md`) | A user-visible behaviour is done when its case exists, tagged `[verified]` / `[not verified]`; sections `REG` and `99` for regressions and known gaps |
-| Design before screen | `.agents/designs/<slug>.md` + `.claude/hooks/design-guard.mjs` (UI repos) | A new Angular feature component or Next.js `page.tsx` is refused until a record with the design-canvas URL and `approved: true` exists |
+| Design before screen | `.agents/designs/<slug>.md` + `.claude/hooks/design-guard.mjs` (the hook ships everywhere and is a no-op without page files; the designs dir only where a UI lives) | A new Angular feature component or Next.js `page.tsx` is refused until a record with the design-canvas URL and `approved: true` exists |
 | Versions | none in files | `vX.Y.Z` tags are cut by the orchestrator's `Release` workflow; no version file, no manual tag |
 
 ## Rolling it onto an existing repo

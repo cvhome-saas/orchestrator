@@ -26,7 +26,7 @@ if [ "$repo" = "cvhome" ]; then
   work="$wt"
 else
   git -C "$dir" fetch origin --quiet
-  git -C "$dir" switch -c "$branch" origin/main 2>/dev/null || git -C "$dir" switch "$branch"
+  git -C "$dir" switch -c "$branch" --no-track origin/main 2>/dev/null || git -C "$dir" switch "$branch"
   work="$dir"
 fi
 
@@ -35,12 +35,12 @@ copy() {  # copy <template-relative> only if absent
   local f="$1"
   if [ ! -e "$work/$f" ]; then mkdir -p "$work/$(dirname "$f")"; cp "templates/repo/$f" "$work/$f"; added+=("$f"); fi
 }
-for f in CLAUDE.md .claude/settings.json .claude/hooks/worktree-guard.mjs .claude/hooks/push-guard.mjs \
+for f in CLAUDE.md .claude/settings.json .claude/hooks/worktree-guard.mjs .claude/hooks/push-guard.mjs .claude/hooks/design-guard.mjs \
          .claude/commands/go.md .claude/commands/reset.md .github/PULL_REQUEST_TEMPLATE.md .github/release.yml \
          .githooks/pre-push scripts/verify.sh scripts/verify.steps.sh .agents/plans/README.md qa/README.md; do
   copy "$f"
 done
-if $ui; then copy .claude/hooks/design-guard.mjs; copy .agents/designs/README.md; fi
+if $ui; then copy .agents/designs/README.md; fi
 if [ ! -e "$work/AGENTS.md" ]; then
   copy AGENTS.md
   usage=$(python3 -c "
