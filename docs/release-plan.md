@@ -1,6 +1,6 @@
 # Release and versioning plan for cvhome-saas
 
-Status: **proposal**, 2026-09-07. Replaces cvhome's current `release.yml` / `suggested-version.sh` /
+Status: **approved 2026-09-07** (lockstep product ring, first aligned version 2.0.0, GitHub App for cross-repo tagging, dev promotion auto-merged); implementation tracked in the migration table. Replaces cvhome's current `release.yml` / `suggested-version.sh` /
 `develop`-branch process entirely; nothing below assumes it.
 
 ## What is wrong today (the facts the plan answers)
