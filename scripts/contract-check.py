@@ -298,8 +298,18 @@ def check_catalog() -> None:
             report(c, "WARN", f"{name} has no `ports: {{ http: … }}` entry in cvhome/lcl.yml (not part of the local stack?)")
         elif lcl_ports[name] != port:
             report(c, "FAIL", f"{name}: lcl.yml port {lcl_ports[name]} != common-config.yml {port}")
+    # load-testing's compose stack copies every port (host:container) and must agree too.
+    lt_compose = LOAD / "stack" / "docker-compose.yml"
+    if lt_compose.exists():
+        text = lt_compose.read_text()
+        for name, port in cp.items():
+            m = re.search(rf"^  {re.escape(name)}:\n(?:(?!^  \S).*\n)*?\s+- \"(\d+):(\d+)\"", text, re.M)
+            if not m:
+                report(c, "WARN", f"{name} has no container in load-testing/stack/docker-compose.yml")
+            elif int(m.group(2)) != port:
+                report(c, "FAIL", f"{name}: load-testing compose container port {m.group(2)} != common-config.yml {port}")
     if not any(r["check"] == c for r in results):
-        report(c, "OK", f"{len(cp)} services agree across common-config.yml, services.yaml, fargate-config.yml, lcl.yml")
+        report(c, "OK", f"{len(cp)} services agree across common-config.yml, services.yaml, fargate-config.yml, lcl.yml, load-testing compose")
 
     # The platform's own, stricter script (also checks image paths and eager-load clients).
     if DRIFT_SCRIPT.exists():

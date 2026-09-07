@@ -12,6 +12,7 @@ description: How to execute a task on the cvhome-saas developer tools - the lcl 
 | `lcl` crashes, mis-allocates ports, leaves orphans, wrong `status`, schema rejects a valid key, a new command | `lcl/` |
 | cvhome's stack fails a health check, a service is missing from `lcl.yml`, hosts entries, "which port is X on" | `cvhome/` (`lcl.yml`, `qa/lcl-qa.md`, `references/qa-testing.md`) → `fullstack-task` |
 | A k6 script, client, journey, threshold, fixture, the run wrapper, Grafana annotation | `load-testing/` |
+| The load stack itself (`stack/docker-compose.yml`, `stack.sh`), the collector / Prometheus rules / Loki / Tempo / Grafana dashboards, `docs/monitoring/` | `load-testing/` — cvhome ships no monitoring configuration |
 | A browser regression test (does the checkout flow still work?), Playwright config/CI | `e2e-testing/` |
 | k6 finds a real defect or the app needs OTEL/Hikari/metrics changes to be measurable | `cvhome/` → `fullstack-task`; note it in `load-testing/README.md` prerequisites table |
 | Sizing/RDS pool after a load finding | `cvhome-platform/` → `infra-task` |
@@ -52,17 +53,24 @@ Read `AGENTS.md` (architecture rules) and load the `k6` skill (`.claude/skills/k
   `k6/scripts/<layer>/`, camelCase under `k6/lib/`.
 - New endpoint coverage → a client method, a `docs/coverage.md` row, and a `make selftest` pass.
 
+**Running a load test — the runbook is `load-testing/docs/monitoring/load-testing.md`; read it before typing.**
+The target is the repo's own compose stack, never cvhome's `lcl` dev stack (gradle bootRun, no memory limit,
+telemetry off: development numbers, never recorded):
+
 ```bash
 cd /Volumes/Disk/IdeaProjects/cvhome-saas/load-testing
-make inspect                              # static validation, no traffic
-(cd ../cvhome && lcl start -d --infra all && lcl urls)   # the target stack
-make preflight && make selftest           # every client method against the live stack
-PROFILE=smoke make <layer>-<name>         # one script; results/<TESTID>.json, Prometheus, Grafana annotation
-npm test                                  # eslint, prettier, markdownlint, shellcheck, actionlint, inspect, build
+# pre-step, the person's: images exist locally (./gradlew bootBuildImage in cvhome → :latest) or LOAD_REGISTRY/LOAD_TAG
+make stack-up                             # stack/docker-compose.yml: platform images + postgres/minio/spg + collector/Loki/Tempo/Prometheus/Grafana, telemetry on
+make preflight && make selftest           # every client method against the stack
+PROFILE=load DURATION=20m make mixed-production-mix   # open-model: DURATION is the whole run; RATE=30 default = the baseline shape
+make dash                                 # Load test vs app for the last TESTID; make stack-stats during the run
+make stack-down                           # keep data; make stack-down-hard drops it
+npm test                                  # eslint, prettier, markdownlint, shellcheck, actionlint, inspect, build; make monitoring-check needs docker
 ```
 
-Numbers go to `docs/baseline.md`; dashboards live in `cvhome/extra/monitoring/grafana/dashboards/load-testing`
-(so a dashboard change is a `cvhome` PR). `make dash` opens `/d/cvhome-load-test-vs-app`.
+`make stack-up` refuses to start over an `lcl` stack on the same ports (`lcl stop` in cvhome first); the stack
+never builds an image. Numbers go to `docs/baseline.md`; dashboards are generated from
+`stack/monitoring/scripts/dashboards.spec.mjs` (run both generators, `make monitoring-check` proves it).
 
 ## `e2e-testing/` — Playwright
 

@@ -12,8 +12,8 @@ honest.
 |---|---|---|---|
 | `cvhome` | `<service>/qa/<svc>-qa.md`, one per runnable app (13 Java services, `console-ui`, `landing-ui`) + `qa/lcl-qa.md` for the stack; `.http` blocks per endpoint | browser through the gateway, `.http` files, `lcl logs/why`; rules in `references/qa-testing.md` § 7 | `lcl start -d --stack <name>` in the worktree |
 | `cvhome-platform` | `qa/platform-qa.md` (to add): a deploy to `dev` from a tag, hibernate/wake, a promotion PR, rollback | `terraform plan` on the PR (CI), CodeBuild run, `outputs.json`, console URL reachable | a real AWS env |
-| `load-testing` | `make selftest` (every client method, `expect.soft`) and `PROFILE=smoke make <layer>-<name>`; `docs/baseline.md` is the record | against `lcl` or `aws` target | cvhome stack |
-| `e2e-testing` | Playwright specs, one per user flow, named after the owning cvhome service; the cvhome QA case it automates gets `[verified] by e2e-testing/<spec>` | `npx playwright test` | cvhome stack |
+| `load-testing` | `make selftest` (every client method, `expect.soft`) and `PROFILE=smoke make <layer>-<name>`; `docs/baseline.md` is the record; `qa/load-testing-qa.md` § 05 for the stack | against `local` (its own compose stack, `make stack-up`) or `aws` | `make stack-up` in load-testing, on prebuilt images |
+| `e2e-testing` | Playwright specs, one per user flow, named after the owning cvhome service; the cvhome QA case it automates gets `[verified] by e2e-testing/<spec>` | `npx playwright test` | cvhome `lcl` stack or load-testing's compose stack |
 | `lcl` | `test/*.test.ts` (lifecycle, compose, safety are integration-style) + `qa/lcl-qa.md`: start/stop/ports/clean against a real project | Docker | its own examples, then `lcl validate --root ../cvhome` |
 | `saas-gateway`, `caddy-domainlookup`, `certmagic-s3` | `qa/edge-qa.md` (to add): custom-domain TLS issuance, `domain_lookup` headers, cert sharing via S3 | run the built image as `spg` in cvhome's compose with the pin bumped | cvhome stack |
 | `aws-otel-collector` | `qa/collector-qa.md` (to add): OTLP in → X-Ray trace, EMF metric, log group | a dev env with `monitoring: true` | AWS |

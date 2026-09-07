@@ -14,10 +14,10 @@ copy, in separate PRs per repo, producers before consumers. CI catches only the 
 | Caddy `storage s3` options | `certmagic-s3/storage.go` (`bucket`, `region`, `prefix`, `endpoint`) | `cvhome/store-pod/spg/Caddyfile` storage block, `cvhome-platform/modules/store-pod/storage.tf` bucket + task IAM | no |
 | Caddyfile directives the plugin understands (`domain_lookup`, `lookup_url`, `cache_ttl`) | `caddy-domainlookup/domainlookup.go` | `cvhome/store-pod/spg/Caddyfile` | no |
 | Domain → store lookup and TLS ask endpoints | `cvhome/store-pod/merchant/.../RouterController.java` | Caddyfile `ask {$ASK_TLS_URL}` and `domain_lookup lookup_url`; platform env values | no |
-| OTLP endpoint and which signals/metrics survive | `aws-otel-collector/otel-config.yaml` (AWS) / `cvhome/extra/monitoring/logging-otel-collector-config.yml` (local) | `cvhome-platform/services.yaml` `infra.otel-collector` ports, `modules/*/main.tf` `OTEL_EXPORTER_OTLP_ENDPOINT`; `cvhome/common-config.yml` otel block (`disabled.keys`, protocol) | cvhome CI validates the **local** collector config only |
-| Whether telemetry is on per environment | `cvhome-platform/flavours.yaml` `monitoring` | `OTEL_SDK_DISABLED`, `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` computed in `modules/*/main.tf`; local default is off (`otel.sdk.disabled: true`), load overlay turns it on | no |
-| HTTP latency SLO buckets | `cvhome/common-config.yml` `http.server.requests` SLO list | `load-testing/k6/config/thresholds.js`, `cvhome/extra/monitoring/grafana/dashboards/load-testing` | no |
-| Local hostnames, demo stores, pod id `507f1f77` | `cvhome/lcl.yml`, `extra/scripts/configure-domain.sh`, `docker-compose-lcl.yml` | `load-testing/k6/config/env/lcl.json`, `k6/data/seed-org1-store1.json`, `docker-compose-load.yml` network aliases | `make selftest` fails loudly |
+| OTLP endpoint and which signals/metrics survive | `aws-otel-collector/otel-config.yaml` (AWS) / `load-testing/stack/monitoring/otel-collector.yml` (local) | `cvhome-platform/services.yaml` `infra.otel-collector` ports, `modules/*/main.tf` `OTEL_EXPORTER_OTLP_ENDPOINT`; `cvhome/common-config.yml` otel block (`disabled.keys`, protocol); `load-testing/stack/docker-compose.yml` collector ports | load-testing CI validates the **local** collector config (`make monitoring-check`) |
+| Whether telemetry is on per environment | `cvhome-platform/flavours.yaml` `monitoring` | `OTEL_SDK_DISABLED`, `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` computed in `modules/*/main.tf`; cvhome dev default is off (`otel.sdk.disabled: true`); `load-testing/stack/docker-compose.yml` turns it on | no |
+| HTTP latency SLO buckets | `cvhome/common-config.yml` `http.server.requests` SLO list | `load-testing/k6/config/thresholds.js`, `load-testing/stack/monitoring/scripts/dashboards.spec.mjs` (load-testing dashboard) | `contract-check.py slo` |
+| Local hostnames, demo stores, pod id `507f1f77`, service ports | `cvhome/common-config.yml`, `lcl.yml`, `extra/scripts/configure-domain.sh` | `load-testing/stack/docker-compose.yml` (network aliases, ports, `SPRING_APPLICATION_JSON`), `load-testing/stack/stack.sh hosts`, `k6/config/env/local.json`, `k6/data/seed-org1-store1.json` | `contract-check.py catalog` (ports) · `make selftest` fails loudly |
 | `lcl.yml` schema (keys, `version: 1`) | `lcl/schema/lcl.schema.json` | `cvhome/lcl.yml`, the `lcl-stack-builder` skill copies in `lcl/` and `cvhome/`, `lcl/templates`, `lcl/examples` | `lcl validate`; `lcl/test/examples.test.ts` |
 | Public architecture story | `cvhome/.claude/skills/project-structure/`, `cvhome-platform/docs/infra-target-architecture.html` | `cvhome-saas.github.io/docs/**`, `cvhome/README.md` | no — the docs site is a year stale |
 | Rate limits, paging, sort conventions, trial caps | `cvhome` service code | `load-testing/AGENTS.md` "facts that shaped the suite" | no |
@@ -49,7 +49,7 @@ compose line in `cvhome`, then `e2e-testing`/`load-testing` if they pin the same
 
 **Change what telemetry reaches CloudWatch**: `aws-otel-collector/otel-config.yaml` → push main (`:latest`
 moves) → force a new ECS deployment of `otel-collector` in `cvhome-platform` (no Terraform diff on `:latest`;
-say so). Local dashboards are a separate `cvhome/extra/monitoring` change.
+say so). The local collector and the dashboards are a separate `load-testing/stack/monitoring` change.
 
-**A perf finding**: `load-testing` (`docs/baseline.md`, a script) → fix in `cvhome` → resize in
-`cvhome-platform` (`flavours.yaml` sizes / `services.yaml` `size`, rds `db_pool_size`) → re-measure.
+**A perf finding**: `load-testing` (`docs/baseline.md`, a script, run on `make stack-up`) → fix in `cvhome` → resize in
+`cvhome-platform` (`flavours.yaml` sizes / `services.yaml` `size`, rds `db_pool_size`) → re-measure on the same stack.

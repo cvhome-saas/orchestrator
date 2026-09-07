@@ -96,6 +96,11 @@ Disambiguators that recur:
 ## Step 2 — before touching the repo
 
 1. `cd` into the repo (or address it with absolute paths). Its own `CLAUDE.md`/`AGENTS.md` and `.claude/skills/` only apply there. **Read `AGENTS.md` yourself** in `cvhome`, `lcl`, `load-testing`: `CLAUDE.md` is one line (`@AGENTS.md`) and nested auto-loading is not guaranteed from the org root.
+1b. **Find the operation's runbook before typing a command.** The skills here are the map, not the manual: for
+   "run a load test", "QA this", "deploy", "release", grep the target repo's `README.md`, `docs/` and `qa/` for
+   the operation and follow *that* (a `## Quick start` is not the whole story — read the section after it too).
+   The 2026-09-07 load test ran against the wrong stack because `AGENTS.md` and the Makefile were read and the
+   README's "load stack" section was not.
 2. Check `references/known-drift.md` for that repo. `cvhome-platform/CLAUDE.md` in particular still says the repo is empty; it is not.
 3. Check `git -C <repo> status` and `git -C <repo> log -5`. Sibling repos advance independently; the local checkout may be behind `origin/main` (`scripts/status.sh`).
 4. Apply the working mode — the same everywhere once `repo-standard` has landed there: a worktree per change cut from `origin/main` (`.claude/worktrees/<type>-<name>`, hook-enforced; the org-level hook re-applies it from here), a plan in `.agents/plans/<name>.md` whose phases are the PRs, `scripts/verify.sh` before push, `/go` to ship. `scripts/standard-check.py <repo>` says whether the repo has adopted it; if not, adopt it first or follow it by hand and say so. Every push to `main` in the image and mirror repos **publishes**.

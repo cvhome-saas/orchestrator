@@ -29,9 +29,10 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Al
   from `PodClient` every minute) and `spg` (`store-pod/spg/Caddyfile`: strips `/merchant*`, `/catalog*`, ...;
   keeps `/cua*`; falls through to `landing-ui`; on-demand TLS + `domain_lookup`).
 - **Local run**: `lcl start -d` from the repo root (`lcl.yml`); infra in Docker via `docker-compose-lcl.yml`
-  (postgres, minio, spg, otel-collector-contrib, loki, tempo, prometheus, grafana), Java on the host. One stack
-  per worktree with `--stack <name>`. `sudo ./extra/scripts/configure-domain.sh` once for `/etc/hosts`.
-  `docker-compose-load.yml` is an overlay that runs every service as its built image (for `load-testing`).
+  (postgres, minio, spg only), Java on the host, telemetry SDK disabled. One stack per worktree with
+  `--stack <name>`. `sudo ./extra/scripts/configure-domain.sh` once for `/etc/hosts`. **No monitoring
+  configuration and no load stack live here** (moved to `load-testing/stack/` 2026-09-08); a dev stack is never
+  a load-test target.
 - **Build/verify**: `./gradlew build -x test -x check`, `test`, `integrationTest` (Docker), `check`
   (checkstyle, warnings = errors, `TODO` fails). `extra/scripts/verify-before-push.sh` writes the receipt the
   push hooks demand. Frontends: `npm run build` **and** `npm run lint` in the `-ui` module.
@@ -112,9 +113,14 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Al
   Target files `k6/config/env/<TARGET>.json`; only `lcl.json` and `aws.example.json` committed.
 - **CI**: `check.yml` (lint stack + `make inspect` + archives), `run-k6.yml` (manual, self-hosted runner).
 - **Skill**: `k6` (`.agents/skills/k6`).
-- **Depends on**: a running cvhome stack (`lcl start -d --infra all` in `../cvhome`, or the
-  `docker-compose-load.yml` overlay), Prometheus/Grafana from `cvhome/extra/monitoring`. App-side prerequisites
-  (OTEL on, Hikari sizing) are cvhome changes, flagged in the README's table, never made here.
+- **The stack and the monitoring** (since 2026-09-08): `stack/docker-compose.yml` runs the platform as its
+  prebuilt images (`./gradlew bootBuildImage` in cvhome or `LOAD_REGISTRY`/`LOAD_TAG`; never built here), one
+  container each at `LOAD_MEM`, plus postgres, minio, spg and otel-collector, Loki, Tempo, Prometheus (rules +
+  promtool tests), Grafana (twelve dashboards generated from `stack/monitoring/scripts/dashboards.spec.mjs`).
+  `make stack-up|down|down-hard|ps|logs|stats`, `make hosts`, `make monitoring-check` (also a CI job).
+  `docs/monitoring/` is the reading guide (`load-testing.md` is the runbook for a run). Target `local`.
+  App-side prerequisites (which metrics a JVM emits, Hikari defaults) are cvhome changes, flagged in the
+  README's table, never made here.
 
 ## saas-gateway — the Caddy image (kind: image)
 
@@ -144,9 +150,9 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Al
   4317/4318 in; `memory_limiter`, per-signal `batch`, `filter/drop_metrics` (drops `spring.*`, `jdbc.*`,
   `hikaricp.*`, `tomcat.*`, `nodejs.*`, ...); `awsxray`, `awsemf`, `awscloudwatchlogs` out; health on 13133.
 - **Publish**: push to main → Docker Hub `${DOCKERHUB_USERNAME}/aws-otel-collector:latest` + `sha-` tag.
-- **Consumer**: `cvhome-platform/services.yaml` `infra.otel-collector` by mutable `:latest`. Local dev uses a
-  different collector (`otel-collector-contrib`, `cvhome/extra/monitoring/logging-otel-collector-config.yml`).
-  `cvhome/extra/monitoring/docs/porting.md` describes carrying the local dashboards to CloudWatch.
+- **Consumer**: `cvhome-platform/services.yaml` `infra.otel-collector` by mutable `:latest`. The local
+  counterpart is `otel-collector-contrib` with `load-testing/stack/monitoring/otel-collector.yml`;
+  `load-testing/docs/monitoring/porting.md` describes carrying the local dashboards to CloudWatch.
 - **State**: current; `README.md` is empty; one uncommitted change in the working tree.
 
 ## cvhome-saas.github.io — public docs site (kind: docs)

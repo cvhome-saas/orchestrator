@@ -38,6 +38,8 @@ anyway.
   0.1.0. A release needs the bump in both `package.json` and `src/version.ts`.
 
 ## load-testing
+- Since 2026-09-08 the load stack and all monitoring configuration live here (`stack/`, `docs/monitoring/`); until
+  the cvhome PR that removes `extra/monitoring` merges, both repos carry a copy and load-testing's is the one to edit.
 - `results/` has 14 local JSON summaries, gitignored; `docs/baseline.md` is the committed record.
 
 ## saas-gateway
@@ -52,6 +54,7 @@ anyway.
 
 ## aws-otel-collector
 - `README.md` is 0 bytes. Consumed by mutable `:latest`. One uncommitted local change in the working tree.
+- Its local twin is `load-testing/stack/monitoring/otel-collector.yml` (since 2026-09-08); the two filter lists are not kept in sync by any check.
 - Workflow sets up buildx/QEMU but `build.sh` does a plain single-arch `docker build`.
 
 ## cvhome-saas.github.io
