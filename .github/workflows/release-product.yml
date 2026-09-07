@@ -47,6 +47,10 @@ jobs:
         id: repos
         run: echo "list=$(python3 scripts/release.py tagged-repos)" >> "$GITHUB_OUTPUT"
 
+      - name: Let git push with the App token
+        # gh uses GH_TOKEN, but plain `git push` in a cloned checkout has no credentials of its own.
+        run: git config --global url."https://x-access-token:${{ steps.app.outputs.token }}@github.com/".insteadOf "https://github.com/"
+
       - name: Clone them at main
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -112,7 +116,7 @@ jobs:
         run: |
           cd cvhome-platform
           git config user.name "release-bot"; git config user.email "release-bot@users.noreply.github.com"
-          git switch -c "promote/dev-$V" origin/main
+          git switch -c "promote/dev-$V" --no-track origin/main
           python3 ../scripts/release.py promote --version "$V" --env dev --platform .
           git commit -am "promote: dev -> $V"
           git push -u origin HEAD

@@ -39,6 +39,10 @@ jobs:
           owner: cvhome-saas
           repositories: cvhome-platform
 
+      - name: Let git push with the App token
+        # gh uses GH_TOKEN, but plain `git push` in a cloned checkout has no credentials of its own.
+        run: git config --global url."https://x-access-token:${{ steps.app.outputs.token }}@github.com/".insteadOf "https://github.com/"
+
       - name: Open the promotion PR
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -47,7 +51,7 @@ jobs:
           scripts/clone.sh cvhome-platform
           cd cvhome-platform
           git config user.name "release-bot"; git config user.email "release-bot@users.noreply.github.com"
-          git switch -c "promote/$e-$v" origin/main
+          git switch -c "promote/$e-$v" --no-track origin/main
           python3 ../scripts/release.py promote --version "$v" --env "$e" --platform .
           git diff --quiet && { echo "$e already runs $v"; exit 0; }
           git commit -am "promote: $e -> $v"
