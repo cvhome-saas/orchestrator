@@ -39,6 +39,17 @@ repo one change touches** — `cvhome-platform`'s drift check compares against t
 | `cvhome-saas.github.io` | `npm ci && npm run docs:build` |
 | `ideation` | none |
 
+## 2b. Cross-repo review before the PR
+
+```bash
+scripts/impact.py <repo> --head <type>/<name>                 # which other repos this touches
+scripts/contract-check.py --<repo> <path-to-branch-checkout>  # do the copies still agree with the change in
+```
+
+A BLOCKS finding means the PR must not be opened alone: open the sibling PR(s) first or in the same
+batch, and link them. NEEDS FOLLOW-UP goes into the PR body under *Deviations* with the repo and file.
+Details: the `cross-repo-review` skill.
+
 ## 3. Commit, push, PR
 
 ```bash

@@ -1,0 +1,61 @@
+name: cross-repo contract check
+
+# The review nobody's per-repo CI can do: clone every active repo at main and check that the
+# copies of each contract (service catalog, ports, edge routes, env/secret names, image pins,
+# SLO buckets, local hostnames, lcl.yml schema) still agree. Runs nightly and on demand.
+# A FAIL here means something merged in one repo will not work with another in production.
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["scripts/**", ".github/workflows/contract-check.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  contract-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Clone every active repo from repos.yaml
+        run: scripts/clone.sh
+
+      - name: Install the lcl CLI the org publishes (for `lcl validate`)
+        run: npm install -g @cvhome-saas/lcl || echo "lcl install failed; lcl-schema check will be skipped"
+
+      - name: Contract check
+        run: |
+          status=0
+          python3 scripts/contract-check.py --json > contract-check.json || status=$?
+          python3 scripts/contract-check.py || true
+          exit $status
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Cross-repo contract check"
+            echo
+            echo '| status | check | message |'
+            echo '|---|---|---|'
+            python3 - <<'PY'
+          import json
+          for r in json.load(open("contract-check.json")):
+              print(f"| {r['status']} | {r['check']} | {r['message'].replace('|', '\\|')} |")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-check
+          path: contract-check.json

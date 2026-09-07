@@ -10,7 +10,8 @@ subdirectory is an independent git repository with its own rules. This repo trac
 **Start every task with the `org-router` skill.** It classifies the ask, names the owning repo(s) and hands
 off to `backend-task` (cvhome), `infra-task` (cvhome-platform + saas-gateway / caddy-domainlookup /
 aws-otel-collector), `tools-task` (lcl, load-testing), `docs-task` (cvhome-saas.github.io, ideation) or
-`cross-repo-change` (several). Its `references/` hold the deep repo map, the cross-repo contract table, the
+`cross-repo-change` (several), and acts as **reviewer** through `cross-repo-review` for any change in any repo
+(`scripts/impact.py` + `scripts/contract-check.py`). Its `references/` hold the deep repo map, the cross-repo contract table, the
 known documentation drift and the deprecated-repo list.
 
 | Repo | Kind | One line |
@@ -43,6 +44,9 @@ Rules that hold everywhere:
 - **Checkouts are managed, not assumed.** `repos.yaml` holds every repo URL; `scripts/clone.sh <repo>`
   clones a missing one or fetches and reports behind/ahead. Run it for each repo a task touches before
   reading code there. `scripts/status.sh` shows all of them.
+- **Every change is reviewed across repos before its PR** (`cross-repo-review`): what a cvhome port, env,
+  route, image pin or SLO change does to cvhome-platform, load-testing, lcl, the image repos, and vice
+  versa. `scripts/contract-check.py` alone is the standing audit; it also runs nightly in this repo's CI.
 - **Multi-repo work is split into one work item per repo**, independent ones in parallel subagents, and
   shipped as one PR per repo (`org-router` step 4, `references/shipping.md`). PRs are opened, never merged,
   unless the user says so.

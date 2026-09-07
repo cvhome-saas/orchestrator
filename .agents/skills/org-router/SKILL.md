@@ -19,6 +19,14 @@ Reference files (read on demand, not all at once):
 | `references/deprecated-repos.md` | A task or doc names a repo not checked out here |
 | `references/shipping.md` | You are about to branch, commit, push or open a PR in any repo, or a checkout is missing/behind |
 
+## Reviewer mode
+
+"Review this", "will this break X", "is it safe to merge", a PR link, or a nightly audit → **`cross-repo-review`**,
+not a repo-local review. It runs `scripts/impact.py` (which consumers a change touches) and
+`scripts/contract-check.py` (do all copies of each contract still agree, with the change substituted in),
+then reads the consumers and gives SAFE / NEEDS FOLLOW-UP / BLOCKS with per-repo follow-ups. Every PR
+the orchestrator opens gets this review first (`references/shipping.md` § 2).
+
 ## Step 0 — the checkouts
 
 Every org repo, its URL, kind and status is in `repos.yaml` at the org root. The router owns the checkouts:
