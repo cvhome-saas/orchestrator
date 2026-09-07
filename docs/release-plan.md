@@ -1,7 +1,8 @@
 # Release and versioning plan for cvhome-saas
 
-Status: **approved 2026-09-07**, simplified the same day: one version everywhere, a git tag and a GitHub
-release per repo, images built by the platform from the tag. Replaces cvhome's old `release.yml` /
+Status: **approved 2026-09-07**, simplified twice: one version everywhere, a git tag and a GitHub release per
+repo, a manifest in the orchestrator. **A release records compatibility between repos; it does not deploy**
+(decision 2026-09-08). Deploying a version is cvhome-platform's own operation. Replaces cvhome's old `release.yml` /
 `suggested-version.sh` / `develop`-branch process entirely.
 
 ## What was wrong
@@ -26,11 +27,9 @@ release per repo, images built by the platform from the tag. Replaces cvhome's o
 3. **A release is one button** in the orchestrator: version decided from cvhome's merged PR labels
    (`warn/*` → major, `type/enhancement` / `feat:` → minor, else patch) or given explicitly; every repo must
    be green on `main`; the cross-repo contract check must pass; then tag + GitHub release (generated notes)
-   in every repo, a manifest `releases/vX.Y.Z.yaml` here, and the dev promotion PR.
-4. **Promotion is a diff.** `envs/<env>.tfvars` `image_tag = "X.Y.Z"` in cvhome-platform is what an
-   environment runs; the platform pipeline builds the app at that tag and applies. Dev is promoted
-   automatically by the release; staging and prod by a PR a person merges. Rollback is the same PR with the
-   older version. `latest` is refused on protected flavours.
+   in every repo and a manifest `releases/vX.Y.Z.yaml` here. Nothing else.
+4. **Releases do not deploy.** What an environment runs is cvhome-platform's concern (`envs/<env>.tfvars`
+   `image_tag`, the bootstrap's `ImageTag`); the orchestrator only records which version each env names.
 5. **Nothing publishes from GitHub Actions in cvhome.** `saas-gateway` and `aws-otel-collector` keep pushing
    `sha-<short>` on `main` for testing; on a `vX.Y.Z` tag their existing workflow also pushes `X.Y.Z` (a
    `type=semver` line in `docker/metadata-action`). `public-dkr` mirrors the released `X.Y.Z` to public ECR;
@@ -47,9 +46,8 @@ Rolling repos (`load-testing`, `e2e-testing`, `public-dkr`, `assets`, `cvhome-sa
 gh workflow run release-product.yml -R cvhome-saas/orchestrator -f bump=auto      # or -f version=2.0.0
 ```
 
-Output: tags and releases in seven repos, `releases/v2.1.0.yaml`, the dev promotion PR merged. Then
-`gh workflow run promote.yml -f version=2.1.0 -f env=staging`, and prod the same way. Hotfix: merge the fix,
-run with `bump=patch`.
+Output: tags and releases in seven repos and `releases/v2.1.0.yaml`. Hotfix: merge the fix, run with
+`bump=patch`. First release cut: **v2.0.0 on 2026-09-07**.
 
 ## Migration
 
@@ -57,8 +55,8 @@ run with `bump=patch`.
 |---|---|---|---|
 | 1 | `cvhome` | version from the tag; `createImageTags` → `X.Y.Z`, `X.Y`, `latest`; old release and publish workflows and `suggested-version.sh` deleted; no publish workflow | [cvhome#334](https://github.com/cvhome-saas/cvhome/pull/334) merged |
 | 2 | `cvhome-platform` | `image_tag` in every `envs/*.tfvars`, no `latest` fallback, guard on protected flavours; bootstrap `ImageTag` parameter, CodeBuild builds the app at `v<ImageTag>` with `-Pversion`; CI compares against cvhome at the same tag | [cvhome-platform#2](https://github.com/cvhome-saas/cvhome-platform/pull/2) merged |
-| 3 | `orchestrator` | `release-product.yml`, `promote.yml`, `scripts/release.py`, `releases/`, `docs/releasing.md`, `contract-check release`; GitHub App secrets | on `main`; App secrets pending |
-| 4 | all tagged repos | first release `2.0.0`; promote dev → staging → prod | after 1–3 merge |
+| 3 | `orchestrator` | `release-product.yml`, `scripts/release.py`, `releases/`, `docs/releasing.md`, `contract-check release` (tracking only); GitHub App secrets | done |
+| 4 | all tagged repos | first release `2.0.0` | done 2026-09-07 |
 | 5 | `saas-gateway`, `aws-otel-collector` | `type=semver` tags in the existing docker-publish workflow so a `vX.Y.Z` tag also pushes `X.Y.Z` | small PRs |
 | 6 | `public-dkr` | mirror `saas-gateway:X.Y.Z` (matrix entry per release, or a `repository_dispatch` handler) | small PR |
 | 7 | `cvhome`, `cvhome-platform` | pin `saas-gateway:X.Y.Z` in `spg/Dockerfile`, `spg/compose.yml`, `docker-compose-lcl.yml`; `services.yaml` collector `aws-otel-collector:X.Y.Z`; `saas-gateway/Dockerfile` plugin pins `@vX.Y.Z` | removes the last `latest` / `sha-` pins |
@@ -70,4 +68,4 @@ run with `bump=patch`.
 - Lockstep tags on every tagged repo, including no-op tags. Simplicity over per-repo cadence.
 - `2.0.0` as the first aligned version.
 - A GitHub App (not a PAT) for the cross-repo tagging.
-- Dev promotion auto-merged; staging and prod by hand.
+- Releases never deploy or promote; environments are moved by cvhome-platform's own means.

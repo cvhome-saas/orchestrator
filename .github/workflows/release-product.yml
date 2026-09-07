@@ -2,8 +2,8 @@ name: Release
 
 # The one button (docs/release-plan.md): one version for every repo. Tags vX.Y.Z on main in each repo
 # that has `tag: true` in repos.yaml, creates a GitHub release with generated notes in each, writes
-# releases/vX.Y.Z.yaml here, and opens the dev promotion PR in cvhome-platform. Images are built by the
-# platform's CodeBuild from the tag; nothing here publishes an artifact.
+# releases/vX.Y.Z.yaml here. That is all a release is: a compatibility record across repos. Nothing here
+# deploys, publishes an artifact, or touches an environment.
 #
 # Needs a GitHub App installed on the org with contents:write + pull_requests:write on the tagged repos,
 # stored as secrets RELEASE_APP_ID / RELEASE_APP_PRIVATE_KEY (GITHUB_TOKEN cannot act on other repos).
@@ -20,10 +20,6 @@ on:
         description: "explicit version (X.Y.Z) — overrides bump; 2.0.0 for the cut-over"
         required: false
         type: string
-      promote_dev:
-        description: "open (and auto-merge) the dev promotion PR in cvhome-platform"
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -107,21 +103,3 @@ jobs:
           git commit -m "release: v$V"
           git push
           { echo '```yaml'; cat "releases/v$V.yaml"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Open the dev promotion PR
-        if: inputs.promote_dev
-        env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
-          V: ${{ steps.version.outputs.version }}
-        run: |
-          cd cvhome-platform
-          git config user.name "release-bot"; git config user.email "release-bot@users.noreply.github.com"
-          git switch -c "promote/dev-$V" --no-track origin/main
-          python3 ../scripts/release.py promote --version "$V" --env dev --platform .
-          git commit -am "promote: dev -> $V"
-          git push -u origin HEAD
-          url=$(gh pr create --base main --title "promote: dev -> $V" \
-            --body "Deploys v$V to dev (CodeBuild builds cvhome at the tag). Manifest: cvhome-saas/orchestrator releases/v$V.yaml. Rollback: the same PR with the previous version.")
-          gh pr merge --auto --squash "$url" || echo "auto-merge not enabled; merge by hand: $url"
-          echo "- dev promotion: $url" >> "$GITHUB_STEP_SUMMARY"
-          echo "Next: \`gh workflow run promote.yml -R cvhome-saas/orchestrator -f version=$V -f env=staging\`" >> "$GITHUB_STEP_SUMMARY"

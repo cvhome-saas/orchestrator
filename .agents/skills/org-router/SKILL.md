@@ -18,7 +18,7 @@ guidance. **Every real change lands in exactly one sub-repo per commit**, under 
 | The cross-repo review: what a change in one repo breaks in another | `cross-repo-review`, `scripts/impact.py`, `scripts/contract-check.py` | Reviewer mode |
 | One working architecture in every repo (AGENTS.md, worktree, plan = phases = PRs, verify receipt, QA file, design record) | `repo-standard`, `templates/repo/`, `scripts/standard-check.py` (nightly), `scripts/standard-apply.sh` | |
 | New repositories in the org, wired into the manifest and the release ring | `new-repo`, `scripts/new-repo.sh` | |
-| Releases: one version, every repo tagged, manifest, promotion PRs | `docs/releasing.md`, `Release` / `Promote` workflows, `scripts/release.py` | never in a sub-repo |
+| Releases: one version, every repo tagged, a manifest — compatibility only, no deploy | `docs/releasing.md`, `Release` workflow, `scripts/release.py` | never in a sub-repo |
 | QA that crosses repos and QA at a release; keeping `[verified]` honest | `references/qa.md` | |
 | The design gate: a new screen starts in the design portal | `fullstack-task` § Design gate, `design-guard.mjs` | |
 | Standing audit of drift between repos and against the standard | nightly `contract-check.yml` | `references/known-drift.md` |
@@ -73,7 +73,8 @@ Match the **subject** of the task, not the words in it ("deploy the new endpoint
 | The org profile on github.com/cvhome-saas, the one-command evaluation install (`fast-run.sh`) | `dot-github/`, `assets/` | `docs-task` |
 | A product idea, missing feature, backlog entry, feature spec before any code | `ideation/` | `docs-task` |
 | In-repo docs (`AGENTS.md`, a skill's `references/*.md`, `qa/*.md`, `docs/*.md`) | the repo that owns the code | the owner's skill, docs section |
-| "release", "cut a version", "deploy 2.1.0 to staging", "roll back prod", "bump lcl", tagging, version numbers, changelog | orchestrator | `docs/releasing.md` (runbook) — run the workflow; never tag or bump by hand in a sub-repo |
+| "release", "cut a version", "bump lcl", tagging, version numbers, changelog | orchestrator | `docs/releasing.md` (runbook) — run the workflow; never tag or bump by hand in a sub-repo. A release records compatibility; it never deploys |
+| "deploy 2.1.0 to dev/staging/prod", "roll back", "what version does prod run" | `cvhome-platform` (`envs/<env>.tfvars` `image_tag`, bootstrap `ImageTag`, the CodeBuild pipeline) | `infra-task` |
 | "create a repo", "new shared lib / tool / image / plugin", a plan naming a repo that does not exist | orchestrator | `new-repo` (a new cvhome service is a module, not a repo) |
 | "add CLAUDE.md to X", "make X follow the conventions", a repo with no AGENTS.md, missing hooks or `/go` | the repo, from here | `repo-standard` |
 | "QA this", "is it verified", "run the smoke after the release" | the owning repo's stack | `references/qa.md` |

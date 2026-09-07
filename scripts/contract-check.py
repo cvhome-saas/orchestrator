@@ -485,7 +485,7 @@ def check_lcl_validate() -> None:
 
 
 def check_release() -> None:
-    """Environments run released versions: every envs/*.tfvars image_tag has a manifest; no latest in protected envs."""
+    """Tracking only: which released version each envs/*.tfvars names. Never a gate — releases record compatibility, they do not deploy."""
     c = "release"
     envs = sorted(PLATFORM.glob("envs/*.tfvars"))
     if not envs:
@@ -503,12 +503,10 @@ def check_release() -> None:
             (problems if env == "prod" and manifests else notes).append(f"{env}: image_tag = latest")
         elif m.group(1) not in manifests:
             problems.append(f"{env}: image_tag {m.group(1)} has no releases/v{m.group(1)}.yaml")
-    if problems:
-        report(c, "FAIL", "; ".join(problems), "release the version (Release product) or promote a released one")
-    if notes:
-        report(c, "WARN", "; ".join(notes) + " — expected only until the 2.0.0 cut-over (docs/release-plan.md)")
-    if not problems and not notes:
-        report(c, "OK", f"every environment runs a released version ({len(manifests)} manifests)")
+    if problems or notes:
+        report(c, "WARN", "; ".join(problems + notes) + f" ({len(manifests)} manifests in releases/)")
+    else:
+        report(c, "OK", f"every environment names a released version ({len(manifests)} manifests)")
 
 
 def check_qa() -> None:

@@ -14,8 +14,6 @@ Release helper for the cvhome-saas product ring (docs/release-plan.md).
         Write the release manifest: for every tagged repo the commit vX.Y.Z points at, plus the commits of
         the validating repos (load-testing, e2e-testing).
 
-    scripts/release.py promote --version 2.0.0 --env dev [--platform ../cvhome-platform]
-        Set `image_tag = "2.0.0"` in envs/<env>.tfvars of a cvhome-platform checkout (the caller commits/PRs).
 
 Needs `gh` authenticated for the org and `git`. Dependency-free on purpose.
 """
@@ -132,17 +130,6 @@ def cmd_manifest(a) -> int:
     return 0
 
 
-def cmd_promote(a) -> int:
-    v = a.version.lstrip("v")
-    path = Path(a.platform) / "envs" / f"{a.env}.tfvars"
-    text = path.read_text()
-    new, n = re.subn(r'^(\s*image_tag\s*=\s*)"[^"]*"', rf'\g<1>"{v}"', text, count=1, flags=re.M)
-    if n == 0:
-        new = text.rstrip("\n") + f'\n\n# product version this environment runs (cvhome-saas/orchestrator releases/)\nimage_tag = "{v}"\n'
-    path.write_text(new)
-    print(f"{path}: image_tag = \"{v}\"")
-    return 0
-
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -157,11 +144,6 @@ def main() -> int:
     mf.add_argument("--out")
     mf.set_defaults(fn=cmd_manifest)
     sub.add_parser("tagged-repos").set_defaults(fn=cmd_tagged_repos)
-    pr = sub.add_parser("promote")
-    pr.add_argument("--version", required=True)
-    pr.add_argument("--env", required=True, choices=["dev", "staging", "prod"])
-    pr.add_argument("--platform", default=str(ORG / "cvhome-platform"))
-    pr.set_defaults(fn=cmd_promote)
     a = ap.parse_args()
     return a.fn(a)
 
