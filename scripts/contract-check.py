@@ -484,6 +484,32 @@ def check_lcl_validate() -> None:
         report(c, "FAIL", "cvhome/lcl.yml does not validate: " + (r.stderr or r.stdout).strip().splitlines()[-1])
 
 
+def check_release() -> None:
+    """Environments run released versions: every envs/*.tfvars image_tag has a manifest; no latest in protected envs."""
+    c = "release"
+    envs = sorted(PLATFORM.glob("envs/*.tfvars"))
+    if not envs:
+        report(c, "SKIP", "no cvhome-platform/envs/*.tfvars")
+        return
+    manifests = {p.stem.lstrip("v") for p in (ORG / "releases").glob("v*.yaml")}
+    problems, notes = [], []
+    for tf in envs:
+        m = re.search(r'^\s*image_tag\s*=\s*"([^"]*)"', tf.read_text(), re.M)
+        env = tf.stem
+        if not m:
+            notes.append(f"{env}: no image_tag (falls back to SSM / latest)")
+        elif m.group(1) == "latest":
+            (problems if env == "prod" else notes).append(f"{env}: image_tag = latest")
+        elif m.group(1) not in manifests:
+            problems.append(f"{env}: image_tag {m.group(1)} has no releases/v{m.group(1)}.yaml")
+    if problems:
+        report(c, "FAIL", "; ".join(problems), "release the version (Release product) or promote a released one")
+    if notes:
+        report(c, "WARN", "; ".join(notes) + " — expected only until the 2.0.0 cut-over (docs/release-plan.md)")
+    if not problems and not notes:
+        report(c, "OK", f"every environment runs a released version ({len(manifests)} manifests)")
+
+
 def check_skill_table() -> None:
     """cvhome's project-structure skill lists every service (the map agents navigate by)."""
     c = "skill-map"
@@ -508,6 +534,7 @@ CHECKS = {
     "load-testing": check_load_env,
     "lcl-schema": check_lcl_validate,
     "skill-map": check_skill_table,
+    "release": check_release,
 }
 
 

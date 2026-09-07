@@ -52,6 +52,9 @@ Rules that hold everywhere:
 - **Every change is reviewed across repos before its PR** (`cross-repo-review`): what a cvhome port, env,
   route, image pin or SLO change does to cvhome-platform, load-testing, lcl, the image repos, and vice
   versa. `scripts/contract-check.py` alone is the standing audit; it also runs nightly in this repo's CI.
+- **Releases are cut here, never in a sub-repo.** `docs/releasing.md` is the runbook, `docs/release-plan.md` the
+  design: `Release product` tags cvhome + cvhome-platform in lockstep and writes `releases/vX.Y.Z.yaml`;
+  `Promote` opens the tfvars PR that moves an environment. Never push a `v*` tag or bump a version file by hand.
 - **Multi-repo work is split into one work item per repo**, independent ones in parallel subagents, and
   shipped as one PR per repo (`org-router` step 4, `references/shipping.md`). PRs are opened, never merged,
   unless the user says so.

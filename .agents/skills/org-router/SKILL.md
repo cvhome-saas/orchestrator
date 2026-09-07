@@ -57,6 +57,7 @@ Match the **subject** of the task, not the words in it ("deploy the new endpoint
 | The org profile on github.com/cvhome-saas, the one-command evaluation install (`fast-run.sh`) | `dot-github/`, `assets/` | `docs-task` |
 | A product idea, missing feature, backlog entry, feature spec before any code | `ideation/` | `docs-task` |
 | In-repo docs (`AGENTS.md`, a skill's `references/*.md`, `qa/*.md`, `docs/*.md`) | the repo that owns the code | the owner's skill, docs section |
+| "release", "cut a version", "deploy 2.1.0 to staging", "roll back prod", "bump lcl", tagging, version numbers, changelog | orchestrator | `docs/releasing.md` (runbook) — run the workflow; never tag or bump by hand in a sub-repo |
 | Two or more of the above, or a fact that is copied across repos | several | `cross-repo-change` |
 
 Disambiguators that recur:

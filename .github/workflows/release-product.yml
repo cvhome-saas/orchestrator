@@ -1,0 +1,135 @@
+name: Release product
+
+# The one button (docs/release-plan.md): tag cvhome and cvhome-platform with the same version, let
+# cvhome's on-tag workflow publish versioned images, write releases/v<version>.yaml here, and open the
+# dev promotion PR in cvhome-platform. Staging/prod promotion is `Promote` (a human merges).
+#
+# Needs a GitHub App installed on the org with contents:write + pull_requests:write on cvhome and
+# cvhome-platform, stored as secrets RELEASE_APP_ID / RELEASE_APP_PRIVATE_KEY. GITHUB_TOKEN cannot
+# push tags that trigger workflows in other repos.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "auto (from merged PR labels) | patch | minor | major"
+        default: auto
+        type: choice
+        options: [auto, patch, minor, major]
+      version:
+        description: "explicit version (X.Y.Z) — overrides bump; use 2.0.0 for the cut-over"
+        required: false
+        type: string
+      promote_dev:
+        description: "open (and auto-merge) the dev promotion PR"
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency: release-product
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/create-github-app-token@v1
+        id: app
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: cvhome-saas
+          repositories: cvhome,cvhome-platform
+
+      - name: Clone the product ring at main
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: scripts/clone.sh cvhome cvhome-platform
+
+      - name: Decide the version
+        id: version
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            v="${{ inputs.version }}"
+          else
+            v="$(python3 scripts/release.py next-version --bump "${{ inputs.bump }}")" || { echo "nothing to release"; exit 1; }
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "## Releasing $v" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Gate — both repos green on main
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          for r in cvhome cvhome-platform; do
+            sha=$(git -C "$r" rev-parse HEAD)
+            state=$(gh api "repos/cvhome-saas/$r/commits/$sha/check-runs" --jq '[.check_runs[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")] | length')
+            if [ "$state" != "0" ]; then echo "::error::$r main ($sha) has $state non-green check runs"; exit 1; fi
+          done
+
+      - name: Gate — cross-repo contracts agree at the pair
+        run: python3 scripts/contract-check.py --only catalog,edges,env,lcl-schema
+
+      - name: Tag and release both repos
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          for r in cvhome cvhome-platform; do
+            sha=$(git -C "$r" rev-parse HEAD)
+            gh api -X POST "repos/cvhome-saas/$r/git/refs" -f ref="refs/tags/v$V" -f sha="$sha"
+            gh release create "v$V" -R "cvhome-saas/$r" --target "$sha" --title "v$V" --generate-notes
+            echo "- tagged cvhome-saas/$r v$V at $sha" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Wait for cvhome to publish images v${{ steps.version.outputs.version }}
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          for i in $(seq 1 60); do
+            run=$(gh run list -R cvhome-saas/cvhome --workflow release-images.yml --branch "v$V" --json status,conclusion,url --jq '.[0]')
+            status=$(echo "$run" | jq -r '.status // "none"'); concl=$(echo "$run" | jq -r '.conclusion // ""')
+            echo "images run: $status $concl"
+            if [ "$status" = "completed" ]; then
+              [ "$concl" = "success" ] || { echo "::error::release-images failed: $(echo "$run" | jq -r .url)"; exit 1; }
+              break
+            fi
+            sleep 60
+          done
+
+      - name: Write the release manifest
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          python3 scripts/release.py manifest --version "$V" --contract-check pass
+          git config user.name "release-bot"; git config user.email "release-bot@users.noreply.github.com"
+          git add "releases/v$V.yaml"
+          git commit -m "release: v$V manifest"
+          git push
+          { echo '```yaml'; cat "releases/v$V.yaml"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open the dev promotion PR
+        if: inputs.promote_dev
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          cd cvhome-platform
+          git config user.name "release-bot"; git config user.email "release-bot@users.noreply.github.com"
+          git switch -c "promote/dev-$V" origin/main
+          python3 ../scripts/release.py promote --version "$V" --env dev --platform .
+          git commit -am "promote: dev -> $V"
+          git push -u origin HEAD
+          url=$(gh pr create --base main --title "promote: dev -> $V" \
+            --body "Deploys product version **$V** to dev. Manifest: cvhome-saas/orchestrator releases/v$V.yaml. Rollback: the same PR with the previous version.")
+          gh pr merge --auto --squash "$url" || echo "auto-merge not enabled on the repo; merge by hand: $url"
+          echo "- dev promotion: $url" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Next: \`gh workflow run promote.yml -R cvhome-saas/orchestrator -f version=$V -f env=staging\`" >> "$GITHUB_STEP_SUMMARY"

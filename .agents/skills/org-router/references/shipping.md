@@ -1,6 +1,7 @@
 # Shipping from the orchestrator — per-repo recipe
 
-All repos: `main` is the integration branch, changes land by PR, `gh` is authenticated for
+All repos: `main` is the integration branch, changes land by PR, versions are git tags set only by the
+orchestrator's release workflows (`docs/releasing.md`; never `git tag v…` or edit a version file by hand), `gh` is authenticated for
 `github.com/cvhome-saas`. Commit trailer on every commit:
 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (plus the session link when the harness gives one).
 Never `--no-verify`, never `SKIP_VERIFY=1`, never push to `main`, never merge a PR unless told to.

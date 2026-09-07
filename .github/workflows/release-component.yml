@@ -1,0 +1,134 @@
+name: Release component (reusable)
+
+# Shared release shape for the component ring (docs/release-plan.md): saas-gateway, aws-otel-collector,
+# caddy-domainlookup, certmagic-s3, lcl. A component repo calls it from its own release.yml:
+#
+#   on: { workflow_dispatch: { inputs: { bump: { type: choice, options: [auto, patch, minor, major], default: auto } } } }
+#   jobs:
+#     release:
+#       uses: cvhome-saas/orchestrator/.github/workflows/release-component.yml@main
+#       with: { bump: ${{ inputs.bump }}, publish: docker }        # docker | go | npm
+#       secrets: inherit
+#
+# It computes the next version from merged PR labels/titles (same rules as the product), tags vX.Y.Z,
+# creates the GitHub release with generated notes, and publishes:
+#   docker : builds ./Dockerfile, pushes <DOCKERHUB_USERNAME>/<repo>:X.Y.Z, X.Y, latest (multi-arch),
+#            then repository_dispatch `mirror` to public-dkr so public ECR gets X.Y.Z without a hand edit
+#   go     : nothing to publish (the tag is the module version); `go build ./...` at the tag as a gate
+#   npm    : the repo's own publish.yml runs on the release event (lcl); nothing to do here
+#
+# Publishing uses the calling repo's secrets (DOCKERHUB_USERNAME / DOCKERHUB_TOKEN) via `secrets: inherit`.
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        type: string
+        default: auto
+      version:
+        type: string
+        required: false
+      publish:
+        type: string
+        required: true   # docker | go | npm
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+      MIRROR_DISPATCH_TOKEN:
+        required: false   # PAT/App token with contents:write on public-dkr, for repository_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: cvhome-saas/orchestrator
+          path: .orchestrator
+
+      - name: Decide the version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          if [ -n "${{ inputs.version }}" ]; then v="${{ inputs.version }}"; else
+            v="$(python3 .orchestrator/scripts/release.py next-version --repo "$repo" --bump "${{ inputs.bump }}")" || { echo "nothing to release"; exit 1; }
+          fi
+          echo "version=${v#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Gate (go)
+        if: inputs.publish == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - if: inputs.publish == 'go'
+        run: go build ./... && go vet ./...
+
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          git tag "v$V"
+          git push origin "v$V"
+          gh release create "v$V" --title "v$V" --generate-notes
+
+      - name: Publish image
+        if: inputs.publish == 'docker'
+        uses: docker/setup-buildx-action@v3
+      - if: inputs.publish == 'docker'
+        uses: docker/setup-qemu-action@v3
+      - if: inputs.publish == 'docker'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - if: inputs.publish == 'docker'
+        id: tags
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"; img="${{ secrets.DOCKERHUB_USERNAME }}/$repo"
+          echo "image=$img" >> "$GITHUB_OUTPUT"
+          echo "tags=$img:$V,$img:${V%.*},$img:latest" >> "$GITHUB_OUTPUT"
+      - if: inputs.publish == 'docker'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Ask public-dkr to mirror X.Y.Z to public ECR
+        if: inputs.publish == 'docker' && env.TOKEN != ''
+        env:
+          TOKEN: ${{ secrets.MIRROR_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.MIRROR_DISPATCH_TOKEN }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          gh api -X POST repos/cvhome-saas/public-dkr/dispatches \
+            -f event_type=mirror \
+            -F 'client_payload[registry]=docker.io' \
+            -F "client_payload[image]=${{ steps.tags.outputs.image }}" \
+            -F "client_payload[tag]=$V"
+      - if: inputs.publish == 'docker' && env.TOKEN == ''
+        env:
+          TOKEN: ${{ secrets.MIRROR_DISPATCH_TOKEN }}
+        run: echo "::warning::MIRROR_DISPATCH_TOKEN not set — add ${{ steps.tags.outputs.image }}:${{ steps.version.outputs.version }} to public-dkr's matrix by hand"
+
+      - name: Summary
+        run: |
+          echo "## Released ${GITHUB_REPOSITORY#*/} v${{ steps.version.outputs.version }} (${{ inputs.publish }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Consumers pick it up by PR (cvhome spg pins, cvhome-platform collector image, saas-gateway plugin pins); the next product release records it in its manifest." >> "$GITHUB_STEP_SUMMARY"
