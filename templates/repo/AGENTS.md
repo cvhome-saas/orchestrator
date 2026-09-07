@@ -30,8 +30,8 @@ Part of the `cvhome-saas` organisation. Cross-repo routing, review and releases 
   deviations as built and verification. One plan, one worktree, one branch; each phase is committed and
   shipped as its own PR before the next begins (stacked if it must). A plan that touches another repo names
   it and hands that phase to the orchestrator (`cross-repo-change`).
-- **Nothing is pushed until the gates have passed locally.** `scripts/verify.sh` runs exactly what CI runs
-  (`scripts/verify.steps.sh`) and writes a receipt for the exact tree; `.githooks/pre-push` and
+- **Nothing is pushed until the gates have passed locally.** Commit, then `scripts/verify.sh` (it runs exactly
+  what CI runs, `scripts/verify.steps.sh`, and writes a receipt for the exact committed tree), then push; `.githooks/pre-push` and
   `.claude/hooks/push-guard.mjs` refuse a push without it, a push to `main`, and `--no-verify`.
 - **`/go` ships the working tree** (commit → verify → push → PR into `main`, template filled, changelog
   label); **`/reset` returns to a clean `main`** without losing work. Both in `.claude/commands/`.

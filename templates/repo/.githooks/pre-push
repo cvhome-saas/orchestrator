@@ -68,7 +68,7 @@ Run the whole pipeline locally first, then push:
 
   scripts/verify.sh
 
-It runs checkstyle, the build, unit and integration tests, the coverage floors, and both frontends'
-lint and tests — the same checks the pipeline runs, so a green run here is a green pipeline there.
+It runs every gate in scripts/verify.steps.sh — the same checks CI runs — so a green run here is a green
+pipeline there. Commit first, then verify, then push: the receipt is for the committed tree.
 MSG
 exit 1

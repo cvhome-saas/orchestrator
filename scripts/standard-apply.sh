@@ -21,7 +21,7 @@ ui=false; case "$repo" in cvhome|cvhome-saas.github.io) ui=true ;; esac
 
 # cvhome enforces its worktree rule; everything else gets a plain branch.
 if [ "$repo" = "cvhome" ]; then
-  wt="$dir/.claude/worktrees/${branch//\//-}"
+  wt="$PWD/$dir/.claude/worktrees/${branch//\//-}"
   [ -d "$wt" ] || git -C "$dir" worktree add --no-track "$wt" -b "$branch" origin/main
   work="$wt"
 else

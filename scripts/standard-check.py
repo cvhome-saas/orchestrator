@@ -84,6 +84,11 @@ def audit(name: str, path: Path) -> dict:
         return {"repo": name, "status": "MISSING-CHECKOUT"}
     required = REQUIRED + (UI_ONLY if name in UI_REPOS else [])
     missing = [f for f in required if not (path / f).exists()]
+    # A repo whose scripts/verify.sh wraps its own pipeline (cvhome: extra/scripts/verify-before-push.sh)
+    # has no steps file to source; only the template verify.sh needs scripts/verify.steps.sh.
+    vs = path / "scripts" / "verify.sh"
+    if "scripts/verify.steps.sh" in missing and vs.exists() and "verify.steps.sh" not in vs.read_text():
+        missing.remove("scripts/verify.steps.sh")
     stale = []
     for f in (".claude/hooks/worktree-guard.mjs", ".claude/hooks/push-guard.mjs", ".claude/hooks/design-guard.mjs", ".githooks/pre-push"):
         a, b = path / f, TEMPLATE / f
