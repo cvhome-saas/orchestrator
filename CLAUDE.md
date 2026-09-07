@@ -40,5 +40,9 @@ Rules that hold everywhere:
 - **Never read secret values** (`aws secretsmanager get-secret-value`, `.env` files with real keys).
 - **Do not extend deprecated repos** (`cvhome-infra`, `cvhome-bootstrap`, `cvhome-secrets`,
   `cvhome-store-pod*`, `cvhome-common-ecs-service`, `eureka-peers`, `aws-consul`, `load-testing-x`).
-- `scripts/status.sh` shows branch and dirtiness across checkouts; `scripts/clone.sh` bootstraps a new
-  machine from `repos.yaml`. Check whether a checkout is behind `origin/main` before reasoning about it.
+- **Checkouts are managed, not assumed.** `repos.yaml` holds every repo URL; `scripts/clone.sh <repo>`
+  clones a missing one or fetches and reports behind/ahead. Run it for each repo a task touches before
+  reading code there. `scripts/status.sh` shows all of them.
+- **Multi-repo work is split into one work item per repo**, independent ones in parallel subagents, and
+  shipped as one PR per repo (`org-router` step 4, `references/shipping.md`). PRs are opened, never merged,
+  unless the user says so.

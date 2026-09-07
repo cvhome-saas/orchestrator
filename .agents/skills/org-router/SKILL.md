@@ -17,6 +17,22 @@ Reference files (read on demand, not all at once):
 | `references/cross-repo-contracts.md` | The change touches two repos, or a "single fact" (port, service name, image, env var, SLO) that several repos copy |
 | `references/known-drift.md` | Before trusting a repo's own CLAUDE.md/README, or when something "should exist but doesn't" |
 | `references/deprecated-repos.md` | A task or doc names a repo not checked out here |
+| `references/shipping.md` | You are about to branch, commit, push or open a PR in any repo, or a checkout is missing/behind |
+
+## Step 0 — the checkouts
+
+Every org repo, its URL, kind and status is in `repos.yaml` at the org root. The router owns the checkouts:
+
+```bash
+cd /Volumes/Disk/IdeaProjects/cvhome-saas
+scripts/clone.sh <repo> [<repo> ...]   # clones from repos.yaml if the directory is missing, else fetches; prints behind/ahead
+scripts/status.sh                      # branch, ahead/behind, dirty count for every checkout
+```
+
+Run it for each repo the task will touch **before** reading code there: a stale `main` produces a plan
+against code that no longer exists. Fast-forward a clean, behind `main` with `git -C <repo> pull --ff-only`.
+A repo with `status: deprecated` is cloned only on explicit request (`scripts/clone.sh <name>` works for any
+status) and never edited.
 
 ## Step 1 — classify the ask
 
@@ -66,6 +82,23 @@ cvhome extra/monitoring SLO buckets ◄─► load-testing k6/config/thresholds.
 
 A typical "feature + infra" task: 1) `cvhome` PR (code, config slices, `.http`, tests, QA) → 2) `cvhome-platform` PR (`services.yaml`, secrets, env) → 3) `load-testing` client/journey if the endpoint matters under load → 4) docs. Say which step you are on; do not squash them into one PR across repos (impossible anyway: separate git repos).
 
-## Step 4 — report
+## Step 4 — divide the work
+
+Break the task into **work items, one per repo**, each with: repo, branch name (the same `<type>/<name>` in
+every repo), files, gates, and what it depends on. Then:
+
+- **Independent items run in parallel.** Spawn one subagent per repo (Agent tool, `general-purpose` or
+  `fork`), giving it the absolute repo path, the area skill to follow (`backend-task`, `infra-task`,
+  `tools-task`, `docs-task`), the branch name, and the exact deliverable. Read-only investigation across
+  repos is also parallel (`Explore` agents). The orchestrator keeps the plan, merges the reports, and does
+  not edit files itself while subagents own a repo.
+- **Dependent items run in order** (producers before consumers, § Step 3). A consumer item may start once
+  the producer's *contract* is fixed (the port, the env var name, the image tag), not necessarily merged;
+  say which assumption it is building on.
+- **One change, one PR per repo**, shipped per `references/shipping.md`. Never mix repos in a commit, never
+  leave a repo's gates unrun because another repo's work is more interesting.
+- Small single-repo tasks skip the subagents: route, do, ship.
+
+## Step 5 — report
 
 Name the repo and the path for every change, in the repo's own terms (`store-pod/catalog/catalog-service/...`, `modules/store-pod/nlb.tf`). If a step was left to another repo, say so and which skill picks it up.
