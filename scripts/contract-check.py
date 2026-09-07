@@ -230,14 +230,26 @@ def platform_env_supplied() -> set[str]:
     return supplied
 
 
+SECRET_LIKE = re.compile(r"SECRET|PASSWORD|_KEY$|TOKEN|CREDENTIAL")
+
+
 def app_env_expected() -> dict[str, set[str]]:
-    """Env names the app reads on Fargate, by source file."""
+    """Env names the app needs supplied on Fargate, by source file.
+
+    Every `${NAME}` with no default in any main config file, plus every `${NAME:default}` whose name looks
+    like a credential: a committed default for a secret is the local seed, and shipping it to AWS because the
+    platform forgot to bind the real one is exactly the failure this check exists for.
+    """
     out: dict[str, set[str]] = {}
-    for path in [FARGATE_CONFIG, *APP.glob("store-commons/autoconfigure/src/main/resources/*fargate*.yml"),
-                 *APP.glob("store-*/**/application-fargate.yml")]:
-        if not path.exists():
+    files = [FARGATE_CONFIG, *APP.glob("store-commons/autoconfigure/src/main/resources/*.yml"),
+             *APP.glob("store-*/*/src/main/resources/application*.yml"), *APP.glob("store-*/*/*/src/main/resources/application*.yml")]
+    for path in files:
+        if not path.exists() or "/build/" in str(path) or path.name.endswith(("-lcl.yml", "-test-stores.yml", "-test.yml")):
             continue
-        names = set(re.findall(r"\$\{([A-Z][A-Z0-9_]{3,})(?::[^}]*)?\}", path.read_text()))
+        names = set()
+        for name, default in re.findall(r"\$\{([A-Z][A-Z0-9_]{3,})(:[^}]*)?\}", path.read_text()):
+            if not default or SECRET_LIKE.search(name):
+                names.add(name)
         if names:
             out[str(path.relative_to(APP))] = names
     if CADDYFILE.exists():
@@ -340,10 +352,13 @@ def check_env() -> None:
     if not (need(SERVICES_YAML, c) and need(BOOTSTRAP, c) and need(CADDYFILE, c)):
         return
     supplied = platform_env_supplied()
+    # Spring relaxed binding: the platform may supply the property under its canonical env name instead
+    # of the placeholder the yml names (com.asrevo.cvhome.admin.password <- COM_ASREVO_CVHOME_ADMIN_PASSWORD).
+    aliases = {"UAA_ADMIN_PASSWORD": "COM_ASREVO_CVHOME_ADMIN_PASSWORD"}
     missing = []
     for src, names in app_env_expected().items():
         for n in sorted(names):
-            if n not in supplied:
+            if n not in supplied and aliases.get(n) not in supplied:
                 missing.append(f"{n} (read in {src})")
     if missing:
         report(c, "FAIL", "app reads env the platform never sets: " + ", ".join(missing),
