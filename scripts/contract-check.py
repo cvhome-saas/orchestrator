@@ -54,7 +54,7 @@ def bind_paths(overrides: dict[str, str]) -> None:
     SERVICES_YAML = PLATFORM / "services.yaml"
     BOOTSTRAP = PLATFORM / "bootstrap/bootstrap.yaml"
     DRIFT_SCRIPT = PLATFORM / "scripts/check-catalog-drift.py"
-    LCL_JSON = LOAD / "k6/config/env/lcl.json"
+    LCL_JSON = LOAD / "k6/config/env/local.json"
     THRESHOLDS = LOAD / "k6/config/thresholds.js"
     K6_CLIENTS = LOAD / "k6/lib/clients"
     K6_LIB = LOAD / "k6/lib"
@@ -474,7 +474,7 @@ def check_load_env() -> None:
     if pod_domain and cfg.get("podDomain") != pod_domain:
         problems.append(f"podDomain {cfg.get('podDomain')} != {pod_domain}")
     if problems:
-        report(c, "FAIL", "k6/config/env/lcl.json disagrees with common-config.yml: " + "; ".join(problems))
+        report(c, "FAIL", "k6/config/env/local.json disagrees with common-config.yml: " + "; ".join(problems))
 
     lib_text = "\n".join(p.read_text() for p in K6_LIB.rglob("*.js"))
     alias = {"pod-registry": "podRegistry", "landing-ui": "storefrontPages", "store-core-gateway": "gateway"}
