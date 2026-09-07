@@ -7,9 +7,12 @@ Release helper for the cvhome-saas product ring (docs/release-plan.md).
         the PRs merged since it (warn/api-change|warn/behavior-change|"!:" → major; type/enhancement|"feat:" →
         minor; else patch; nothing but ignore-changelog → exit 3, "no release").
 
+    scripts/release.py tagged-repos
+        Print the repos that receive the product tag (repos.yaml `tag: true`), space-separated.
+
     scripts/release.py manifest --version 2.0.0 [--out releases/v2.0.0.yaml]
-        Write the release manifest: product tag pair (tag + commit), images.json from cvhome's release asset,
-        the latest tag of every component repo, and the contract-check result at the pair.
+        Write the release manifest: for every tagged repo the commit vX.Y.Z points at, plus the commits of
+        the validating repos (load-testing, e2e-testing).
 
     scripts/release.py promote --version 2.0.0 --env dev [--platform ../cvhome-platform]
         Set `image_tag = "2.0.0"` in envs/<env>.tfvars of a cvhome-platform checkout (the caller commits/PRs).
@@ -28,9 +31,13 @@ from pathlib import Path
 
 ORG = Path(__file__).resolve().parent.parent
 GH_ORG = "cvhome-saas"
-PRODUCT = ("cvhome", "cvhome-platform")
-COMPONENTS = ("saas-gateway", "caddy-domainlookup", "certmagic-s3", "aws-otel-collector", "lcl")
 VALIDATORS = ("load-testing", "e2e-testing")
+
+
+def tagged_repos() -> list[str]:
+    """Repos with `tag: true` in repos.yaml, in manifest order."""
+    text = (ORG / "repos.yaml").read_text()
+    return [b.split("\n", 1)[0].strip() for b in re.split(r"\n  - name: ", text)[1:] if re.search(r"\n    tag: true", b)]
 SEMVER = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
 
@@ -102,33 +109,22 @@ def cmd_next_version(a) -> int:
     return 0
 
 
+def cmd_tagged_repos(a) -> int:
+    print(" ".join(tagged_repos()))
+    return 0
+
+
 def cmd_manifest(a) -> int:
     v = a.version.lstrip("v")
     tag = f"v{v}"
-    doc = [f"product: {v}", f"date: {dt.date.today().isoformat()}"]
-    for repo in PRODUCT:
+    doc = [f"version: {v}", f"date: {dt.date.today().isoformat()}", "repos:"]
+    for repo in tagged_repos():
         sha = sh("gh", "api", f"repos/{GH_ORG}/{repo}/git/ref/tags/{tag}", "--jq", ".object.sha", check=False)
-        doc.append(f"{repo + ':':18} {{ tag: {tag}, commit: {sha[:8] if sha else 'MISSING'} }}")
-    doc.append("images:")
-    images = []
-    try:
-        subprocess.run(["gh", "release", "download", tag, "-R", f"{GH_ORG}/cvhome", "-p", "images.json", "-O", "/tmp/cvhome-images.json", "--clobber"],
-                       check=True, capture_output=True)
-        images = json.loads(Path("/tmp/cvhome-images.json").read_text())
-    except subprocess.CalledProcessError:
-        doc.append("  # images.json asset not found on the cvhome release; fill after release-images.yml completes")
-    for img in images:
-        doc.append(f"  {img['image'] + ':':22} {{ tag: {img['tag']}, digest: {img.get('digest', 'unknown')} }}")
-    doc.append("components:")
-    for repo in COMPONENTS:
-        pin = a.pins.get(repo) if a.pins else None
-        t = pin or latest_tag(repo)
-        doc.append(f"  {repo + ':':22} {t.lstrip('v') if t else 'untagged'}")
+        doc.append(f"  {repo + ':':22} {sha[:8] if sha else 'MISSING'}")
     doc.append("validated_by:")
     for repo in VALIDATORS:
         sha = sh("gh", "api", f"repos/{GH_ORG}/{repo}/commits/main", "--jq", ".sha", check=False)
-        doc.append(f"  {repo + ':':16} {{ commit: {sha[:8] if sha else 'null'}, result: pending }}")
-    doc.append(f"contract_check: {a.contract_check}")
+        doc.append(f"  {repo + ':':22} {{ commit: {sha[:8] if sha else 'null'}, result: pending }}")
     out = Path(a.out or ORG / "releases" / f"{tag}.yaml")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(doc) + "\n")
@@ -159,17 +155,14 @@ def main() -> int:
     mf = sub.add_parser("manifest")
     mf.add_argument("--version", required=True)
     mf.add_argument("--out")
-    mf.add_argument("--contract-check", default="unknown")
-    mf.add_argument("--pin", action="append", default=[], help="component=version override, repeatable")
     mf.set_defaults(fn=cmd_manifest)
+    sub.add_parser("tagged-repos").set_defaults(fn=cmd_tagged_repos)
     pr = sub.add_parser("promote")
     pr.add_argument("--version", required=True)
     pr.add_argument("--env", required=True, choices=["dev", "staging", "prod"])
     pr.add_argument("--platform", default=str(ORG / "cvhome-platform"))
     pr.set_defaults(fn=cmd_promote)
     a = ap.parse_args()
-    if getattr(a, "pin", None) is not None:
-        a.pins = dict(p.split("=", 1) for p in a.pin)
     return a.fn(a)
 
 

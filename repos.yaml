@@ -5,6 +5,7 @@
 #
 # kind: app | infra | tool | image | plugin | docs | ideas | mirror
 # dir:  local directory name when it differs from the repo name
+# tag:  true = receives the product tag vX.Y.Z on every release (docs/release-plan.md); one version everywhere
 org: cvhome-saas
 repos:
   - name: orchestrator
@@ -14,18 +15,21 @@ repos:
     entry: [CLAUDE.md, repos.yaml, .agents/skills/org-router/SKILL.md]
 
   - name: cvhome
+    tag: true
     kind: app
     url: https://github.com/cvhome-saas/cvhome.git
     usage: The application monorepo. Java 25 / Spring Boot microservices, Angular console-ui, Next.js landing-ui, one Gradle composite build. Source of truth for services and ports (common-config.yml). Builds every service image, including store-pod/spg on top of the saas-gateway image.
     entry: [AGENTS.md, .claude/skills/project-structure/SKILL.md, lcl.yml, settings.gradle]
 
   - name: cvhome-platform
+    tag: true
     kind: infra
     url: https://github.com/cvhome-saas/cvhome-platform.git
     usage: AWS infrastructure. Terraform (ECS Fargate, Cloud Map, ALB/NLB, RDS, CloudFront) plus the one-click CloudFormation bootstrap and the CodeBuild pipeline that builds cvhome's images and applies. services.yaml mirrors the app catalog and is drift-checked in CI.
     entry: [README.md, CLAUDE.md, services.yaml, flavours.yaml, .claude/plans/infra-implementation-plan.md]
 
   - name: lcl
+    tag: true
     kind: tool
     url: https://github.com/cvhome-saas/lcl.git
     usage: Public npm CLI @cvhome-saas/lcl. Language-neutral local stack runner driven by one lcl.yml. cvhome depends on it; cvhome owns only its lcl.yml. load-testing reads live ports from `lcl urls`.
@@ -44,24 +48,28 @@ repos:
     entry: [playwright.config.ts, tests/, .github/workflows/playwright.yml]
 
   - name: saas-gateway
+    tag: true
     kind: image
     url: https://github.com/cvhome-saas/saas-gateway.git
     usage: Caddy base image (xcaddy with certmagic-s3 + caddy-domainlookup, alpine runtime) that cvhome/store-pod/spg builds FROM. Publishes latest + sha-<short> to Docker Hub on push to main; public-dkr mirrors a chosen sha to public ECR; cvhome pins that sha.
     entry: [Dockerfile, .github/workflows/docker-publish.yml]
 
   - name: caddy-domainlookup
+    tag: true
     kind: plugin
     url: https://github.com/cvhome-saas/caddy-domainlookup.git
     usage: Caddy v2 middleware `domain_lookup` that maps the request host to tenant headers (Store-Id, Theme, ...) via merchant's lookup-by-domain API, cached, failing open. Compiled into saas-gateway from source path.
     entry: [domainlookup.go, go.mod]
 
   - name: certmagic-s3
+    tag: true
     kind: plugin
     url: https://github.com/cvhome-saas/certmagic-s3.git
     usage: Org fork of the certmagic S3 storage backend (aws-sdk-go-v2). Gives Caddy `storage s3 { bucket region prefix endpoint }` so every spg task shares on-demand certificates through the per-pod cert bucket. Compiled into saas-gateway.
     entry: [storage.go, s3.go, README.md]
 
   - name: aws-otel-collector
+    tag: true
     kind: image
     url: https://github.com/cvhome-saas/aws-otel-collector.git
     usage: ADOT collector image with the project config baked in (OTLP 4317/4318 in; X-Ray, EMF, CloudWatch Logs out; metric prefix filter). One per environment on AWS, referenced from cvhome-platform services.yaml `infra.otel-collector` by :latest.
