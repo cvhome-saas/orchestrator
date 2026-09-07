@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/subrepo-guard.mjs\"",
+            "timeout": 15,
+            "statusMessage": "Applying the sub-repo's own guards"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+# This is the *org* repo: it tracks only org-level guidance, skills, the repo manifest
+# and helper scripts. Every sub-repo is its own git checkout and is NOT tracked here.
+# Keep this list in sync with repos.yaml (scripts/clone.sh reads that file).
+/cvhome/
+/cvhome-platform/
+/lcl/
+/load-testing/
+/saas-gateway/
+/caddy-domainlookup/
+/aws-otel-collector/
+/cvhome-saas.github.io/
+/ideation/
+# Any other checkout dropped in here (deprecated repos cloned for reference, scratch clones)
+/cvhome-*/
+/e2e-testing/
+/load-testing-x/
+/certmagic-s3/
+/public-dkr/
+/assets/
+/shopizer/
+/eureka-peers/
+/aws-consul/
+
+.DS_Store
+.idea/
+node_modules/
+*.log
