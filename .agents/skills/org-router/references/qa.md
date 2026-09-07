@@ -27,11 +27,12 @@ honest.
 2. **Route QA to the right stack.** A cvhome change is QA'd in its worktree's own `lcl --stack`; a
    load-testing or e2e-testing change against a cvhome stack; an edge change by bumping the pin in a
    cvhome worktree and running the custom-domain cases; a platform change in `dev`.
-3. **Cross-repo QA after a release.** `Release` tags everything; the promotion PR deploys `dev`. The
-   orchestrator then runs, in order: `load-testing` `make selftest` and `PROFILE=smoke make all-smoke`
-   against the deployed dev (TARGET=aws once `k6/config/env/aws.json` exists), the `[verified]` cases of the
-   cvhome services the release touched (from the release notes), and records the outcome in
-   `releases/vX.Y.Z.yaml` under `validated_by`. A failure blocks the staging promotion.
+3. **Cross-repo QA after a release.** `Release` tags everything and deploys nothing. The orchestrator
+   validates the pair the way it will run: `LOAD_TAG=X.Y.Z make stack-up` in load-testing (images the person
+   built or pushed for that tag), then `make preflight`, `make selftest`, `PROFILE=smoke make all-smoke`, then
+   the `[verified]` cases of the cvhome services the release touched (from the release notes). The outcome
+   goes into `releases/vX.Y.Z.yaml` under `validated_by`; a failure is a finding against the pair, never a
+   deploy decision.
 4. **Keep the tags honest.** A case marked `[verified]` names what verified it (a date and a stack, or an
    e2e spec). A PR that adds a feature with only `[not verified]` cases is merged only with that fact in
    its body; the reviewer says so rather than implying coverage.
