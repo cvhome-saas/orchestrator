@@ -4,6 +4,9 @@ Verify against the file before acting on any of these; fix the doc in its owning
 anyway.
 
 ## cvhome-platform
+- **v2.0.0 pair is not self-consistent**: cvhome v2.0.0 (PR #330) needs `UAA_IMPERSONATION_SECRET` bound to
+  `uaa` and `store-core-gateway`; cvhome-platform v2.0.0 does not generate or bind it (fix: cvhome-platform#6,
+  lands in the next release). Deploying v2.0.0 to an environment needs that fix plus a stack update.
 - `CLAUDE.md` says the repo is empty, not a git repo, and that the architecture proposal is unwritten. All
   false: ~6,200 lines of HCL/YAML/Python, ~30 commits, `docs/infra-target-architecture.html` exists, the stack
   has been applied and is being debugged against live failures (Sept 6 commits).
