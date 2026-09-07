@@ -499,7 +499,8 @@ def check_release() -> None:
         if not m:
             notes.append(f"{env}: no image_tag (falls back to SSM / latest)")
         elif m.group(1) == "latest":
-            (problems if env == "prod" else notes).append(f"{env}: image_tag = latest")
+            # prod on latest is a failure once a release exists; before the 2.0.0 cut-over it is the known state
+            (problems if env == "prod" and manifests else notes).append(f"{env}: image_tag = latest")
         elif m.group(1) not in manifests:
             problems.append(f"{env}: image_tag {m.group(1)} has no releases/v{m.group(1)}.yaml")
     if problems:
