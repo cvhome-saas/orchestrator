@@ -18,8 +18,7 @@ orchestrator/                this repo: manifest, scripts, agent routing skills
 ├── assets/                  fast-run.sh one-command evaluation install
 ├── cvhome-saas.github.io/   public docs site
 ├── dot-github/              org profile (.github repo)
-├── ideation/                product backlog
-└── shopizer/                upstream fork cvhome evolved from (read-only)
+└── ideation/                product backlog
 ```
 
 Each subdirectory is its own git repository and is git-ignored here. `repos.yaml` lists every org repo

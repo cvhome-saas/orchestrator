@@ -28,7 +28,7 @@ the orchestrator opens gets this review first (`references/shipping.md` § 2).
 
 ## Step 0 — the checkouts
 
-Every org repo, its URL, kind and usage is in `repos.yaml` at the org root — sixteen repos, all of them part
+Every org repo, its URL, kind and usage is in `repos.yaml` at the org root — fifteen repos, all of them part
 of development. The router owns the checkouts:
 
 ```bash
@@ -39,7 +39,7 @@ scripts/status.sh                      # branch, ahead/behind, dirty count for e
 
 Run it for each repo the task will touch **before** reading code there: a stale `main` produces a plan
 against code that no longer exists. Fast-forward a clean, behind `main` with `git -C <repo> pull --ff-only`.
-`.github` is checked out as `dot-github/` (manifest `dir:`); `shopizer` is read-only upstream reference.
+`.github` is checked out as `dot-github/` (manifest `dir:`).
 
 ## Step 1 — classify the ask
 
@@ -55,7 +55,6 @@ Match the **subject** of the task, not the words in it ("deploy the new endpoint
 | Playwright browser regression tests (correctness, not performance) | **`e2e-testing/`** | `tools-task` |
 | The public docs site (VitePress), architecture pages | `cvhome-saas.github.io/` | `docs-task` |
 | The org profile on github.com/cvhome-saas, the one-command evaluation install (`fast-run.sh`) | `dot-github/`, `assets/` | `docs-task` |
-| "How did Shopizer do X", legacy behaviour a cvhome module still mirrors | `shopizer/` (read-only) | the owner's skill; never edit shopizer |
 | A product idea, missing feature, backlog entry, feature spec before any code | `ideation/` | `docs-task` |
 | In-repo docs (`AGENTS.md`, a skill's `references/*.md`, `qa/*.md`, `docs/*.md`) | the repo that owns the code | the owner's skill, docs section |
 | Two or more of the above, or a fact that is copied across repos | several | `cross-repo-change` |

@@ -3,7 +3,7 @@
 # next to this file by scripts/clone.sh (which reads this manifest); scripts/status.sh reports on them;
 # the org-router skill reads `kind` and `usage` to route tasks.
 #
-# kind: app | infra | tool | image | plugin | docs | ideas | mirror | upstream
+# kind: app | infra | tool | image | plugin | docs | ideas | mirror
 # dir:  local directory name when it differs from the repo name
 org: cvhome-saas
 repos:
@@ -97,9 +97,3 @@ repos:
     url: https://github.com/cvhome-saas/ideation.git
     usage: Product backlog as Markdown feature docs (F-001 .. F-008) with a template and status table. Module names in it are aspirational; map them to the current layout when an idea becomes a plan.
     entry: [README.md, features/]
-
-  - name: shopizer
-    kind: upstream
-    url: https://github.com/cvhome-saas/shopizer.git
-    usage: The Shopizer 3.2.7 fork cvhome evolved from (Java 17, Maven, sm-core / sm-shop). Read-only reference for domain concepts and legacy behaviour when a cvhome module still mirrors it; nothing is built or deployed from it.
-    entry: [README.md, sm-core/, sm-shop/]

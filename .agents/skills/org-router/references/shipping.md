@@ -42,7 +42,6 @@ repo one change touches** — `cvhome-platform`'s drift check compares against t
 | `aws-otel-collector` | `docker build .`; collector config validated with `otelcol validate --config otel-config.yaml` if available |
 | `cvhome-saas.github.io` | `npm ci && npm run docs:build` |
 | `ideation` | none |
-| `shopizer` | never edited |
 
 ## 2b. Cross-repo review before the PR
 

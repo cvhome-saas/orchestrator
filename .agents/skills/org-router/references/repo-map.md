@@ -1,4 +1,4 @@
-# Repo map — the sixteen org repos
+# Repo map — the fifteen org repos
 
 Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. All of them are cloned by
 `scripts/clone.sh` (`repos.yaml` is the list). Each repo's own
@@ -223,10 +223,3 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Al
   link to the docs site). Checked out as `dot-github/` because a dotfile directory would be invisible in listings.
 - **Rule**: keep its claims consistent with `repos.yaml` and the docs site; community-health defaults for all
   repos (issue templates, CODEOWNERS) would live here if introduced.
-
-## shopizer — upstream (kind: upstream, read-only)
-
-- **What**: Shopizer 3.2.7 (Java 17, Maven; `sm-core`, `sm-core-model`, `sm-core-modules`, `sm-shop`,
-  `sm-shop-model`), the codebase cvhome evolved from. Branch `3.2.7`.
-- **Use**: reference for domain concepts and legacy behaviour when a cvhome module still mirrors it (merchant store,
-  catalog, order, customer). Nothing is built, tested or deployed from it, and it is never edited.

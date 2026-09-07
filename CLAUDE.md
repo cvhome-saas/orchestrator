@@ -30,7 +30,6 @@ known documentation drift and the shipping recipe.
 | `assets/` | docs | `fast-run.sh` one-command evaluation install, served raw from GitHub |
 | `dot-github/` | docs | Org profile README (`.github` repo) |
 | `ideation/` | ideas | Product backlog as Markdown |
-| `shopizer/` | upstream | The fork cvhome evolved from; read-only reference |
 
 Rules that hold everywhere:
 
@@ -45,8 +44,8 @@ Rules that hold everywhere:
 - **Nothing is deployed from `cvhome`'s CI**; images build in CodeBuild and Terraform applies. Do not add
   deploy steps to the app repo.
 - **Never read secret values** (`aws secretsmanager get-secret-value`, `.env` files with real keys).
-- **`shopizer/` is read-only.** Everything else is live: a push to `main` in the image and mirror repos
-  publishes; `assets/` is served raw from GitHub the moment it moves.
+- **Every repo is live.** A push to `main` in the image and mirror repos publishes; `assets/` is served raw
+  from GitHub the moment it moves.
 - **Checkouts are managed, not assumed.** `repos.yaml` holds every repo URL; `scripts/clone.sh <repo>`
   clones a missing one or fetches and reports behind/ahead. Run it for each repo a task touches before
   reading code there. `scripts/status.sh` shows all of them.
