@@ -39,6 +39,9 @@ jobs:
           python3 scripts/contract-check.py || true
           exit $status
 
+      - name: Repo standard check
+        run: python3 scripts/standard-check.py || echo "::warning::some repos have not adopted the repo standard (see log)"
+
       - name: Summary
         if: always()
         run: |

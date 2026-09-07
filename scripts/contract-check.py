@@ -511,6 +511,31 @@ def check_release() -> None:
         report(c, "OK", f"every environment runs a released version ({len(manifests)} manifests)")
 
 
+def check_qa() -> None:
+    """Every runnable cvhome app has its QA file; report how much of it is unverified."""
+    c = "qa"
+    if not need(COMMON_CONFIG, c):
+        return
+    missing, unverified, total = [], 0, 0
+    dirs = {"store-core-gateway": "gateway"}
+    for svc in parse_common_config():
+        if svc == "spg":
+            continue
+        name = dirs.get(svc, svc)
+        files = list(APP.glob(f"store-*/{name}/*/qa/*-qa.md")) + list(APP.glob(f"store-*/{name}/qa/*-qa.md")) \
+            + list(APP.glob(f"store-*/*/{name}/qa/*-qa.md")) + list(APP.glob(f"store-*/*/{name}-service/qa/*-qa.md"))
+        if not files:
+            missing.append(svc)
+            continue
+        text = "\n".join(f.read_text() for f in files)
+        total += len(re.findall(r"\[verified\]", text)) + len(re.findall(r"\[not verified\]", text))
+        unverified += len(re.findall(r"\[not verified\]", text))
+    if missing:
+        report(c, "FAIL", f"cvhome services with no qa/<svc>-qa.md: {missing}", "AGENTS.md: every runnable app has one; copy billing-qa.md's structure")
+    if total:
+        report(c, "WARN" if unverified else "OK", f"{total} cvhome QA cases, {unverified} [not verified]")
+
+
 def check_skill_table() -> None:
     """cvhome's project-structure skill lists every service (the map agents navigate by)."""
     c = "skill-map"
@@ -536,6 +561,7 @@ CHECKS = {
     "lcl-schema": check_lcl_validate,
     "skill-map": check_skill_table,
     "release": check_release,
+    "qa": check_qa,
 }
 
 

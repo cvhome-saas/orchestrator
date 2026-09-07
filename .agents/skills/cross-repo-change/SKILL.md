@@ -27,7 +27,7 @@ Sub-repos are independent git repositories. There is no atomic multi-repo commit
    3. load-testing  feat/<name>      client, coverage.md … gates: make inspect, make selftest
    4. docs          …                
    ```
-4. **Execute per repo with that repo's skill**: `backend-task`, `infra-task`, `tools-task`, `docs-task`.
+4. **Execute per repo with that repo's skill**: `fullstack-task`, `infra-task`, `tools-task`, `docs-task`.
    Each repo's own worktree/branch rules apply (cvhome: worktree; others: branch). Do not leave a repo
    half-done to start the next one; finish its gates, open its PR, then move on.
 5. **Account for the drift check.** `cvhome-platform` CI compares `services.yaml` against the app on

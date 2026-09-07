@@ -70,7 +70,7 @@ edits publish to `s3://cvhome-saas/platform/bootstrap.yaml` on merge to `main`.
 
 | Repo | Change here when | After merging to `main` |
 |---|---|---|
-| `saas-gateway/` | Caddy version, Go version, plugin list, runtime image | Docker Hub `sha-<short>` is published; mirror to public ECR (outside these repos) and **bump the pin** in `cvhome/store-pod/spg/Dockerfile` and `cvhome/docker-compose-lcl.yml` (a `backend-task`) |
+| `saas-gateway/` | Caddy version, Go version, plugin list, runtime image | Docker Hub `sha-<short>` is published; mirror to public ECR (outside these repos) and **bump the pin** in `cvhome/store-pod/spg/Dockerfile` and `cvhome/docker-compose-lcl.yml` (a `fullstack-task`) |
 | `caddy-domainlookup/` | The `domain_lookup` directive, cache, lookup contract with `merchant`'s `RouterController` | Rebuild `saas-gateway` (it builds the plugin from source path), then the pin bump above. Fix the Go 1.21 CI vs `go 1.23` mismatch when you are there |
 | `certmagic-s3/` | Caddy `storage s3 { bucket region prefix endpoint }` — how spg tasks share on-demand certs in the per-pod cert bucket | Same chain: rebuild `saas-gateway`, mirror, bump pins. Keep the Caddyfile's `storage s3` block and the bucket IAM in `modules/store-pod` in step with any new option |
 | `public-dkr/` | An image must exist at `public.ecr.aws/b2i4h4k9/...`: a new `saas-gateway` sha, a node/postgres/otel/paketo base bump | Push to `main` runs the matrix (needs the repo's AWS secrets); then bump the consumer (`cvhome` Dockerfiles / compose / `spg` FROM). The matrix is the only record of what the public registry holds |

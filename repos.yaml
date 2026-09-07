@@ -11,7 +11,7 @@ repos:
   - name: orchestrator
     kind: docs
     url: https://github.com/cvhome-saas/orchestrator.git
-    usage: This repo. The org root that agents start in - repo manifest, clone/status scripts, the routing skills (org-router, backend-task, infra-task, tools-task, docs-task, cross-repo-change) and the reviewer (cross-repo-review, scripts/impact.py, scripts/contract-check.py).
+    usage: This repo. The org root that agents start in - repo manifest, clone/status scripts, the routing skills (org-router, fullstack-task, infra-task, tools-task, docs-task, cross-repo-change) and the reviewer (cross-repo-review, scripts/impact.py, scripts/contract-check.py).
     entry: [CLAUDE.md, repos.yaml, .agents/skills/org-router/SKILL.md]
 
   - name: cvhome

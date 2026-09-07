@@ -9,8 +9,8 @@
  * it works out which sub-repo a Write/Edit path or a `git push` belongs to and runs that repo's
  * guard with `cwd` inside the repo, so the guard's own `git rev-parse` logic resolves correctly.
  *
- * Generic on purpose: any sub-repo that adds `.claude/hooks/worktree-guard.mjs` or
- * `.claude/hooks/push-guard.mjs` is guarded automatically. Exit codes and stderr pass through.
+ * Generic on purpose: any sub-repo that adds `.claude/hooks/worktree-guard.mjs`, `design-guard.mjs` or
+ * `.claude/hooks/push-guard.mjs` (the repo-standard set) is guarded automatically. Exit codes and stderr pass through.
  */
 import {existsSync, readFileSync} from 'node:fs';
 import {dirname, isAbsolute, relative, resolve} from 'node:path';
@@ -42,6 +42,15 @@ function subrepoOf(p) {
   return existsSync(resolve(dir, '.git')) ? {name: top, dir} : null;
 }
 
+function runNoExit(repo, guard, cwd) {
+  const script = resolve(repo.dir, '.claude', 'hooks', guard);
+  if (!existsSync(script)) return;
+  const r = spawnSync(process.execPath, [script], {cwd, input: raw, encoding: 'utf8', env: process.env});
+  if (r.stderr) process.stderr.write(r.stderr);
+  if (r.stdout) process.stdout.write(r.stdout);
+  if ((r.status ?? 0) !== 0) process.exit(r.status);
+}
+
 function run(repo, guard, cwd) {
   const script = resolve(repo.dir, '.claude', 'hooks', guard);
   if (!existsSync(script)) return;
@@ -57,7 +66,11 @@ const ti = input?.tool_input ?? {};
 if (/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(tool)) {
   const target = ti.file_path ?? ti.path ?? ti.notebook_path;
   const repo = subrepoOf(target);
-  if (repo) run(repo, 'worktree-guard.mjs', repo.dir);
+  if (repo) {
+    // Both guards, in order; each exits the process on a block. Missing guard = no-op.
+    runNoExit(repo, 'worktree-guard.mjs', repo.dir);
+    runNoExit(repo, 'design-guard.mjs', repo.dir);
+  }
   process.exit(0);
 }
 

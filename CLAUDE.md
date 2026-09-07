@@ -8,10 +8,11 @@ subdirectory is an independent git repository with its own rules. This repo trac
 `scripts/`, the routing skills under `.agents/skills/` (linked from `.claude/skills/`) and this file.
 
 **Start every task with the `org-router` skill.** It classifies the ask, names the owning repo(s) and hands
-off to `backend-task` (cvhome), `infra-task` (cvhome-platform + saas-gateway / caddy-domainlookup /
-aws-otel-collector), `tools-task` (lcl, load-testing), `docs-task` (cvhome-saas.github.io, ideation) or
-`cross-repo-change` (several), and acts as **reviewer** through `cross-repo-review` for any change in any repo
-(`scripts/impact.py` + `scripts/contract-check.py`). Its `references/` hold the deep repo map, the cross-repo contract table, the
+off to `fullstack-task` (cvhome: Java + Angular + Next.js), `infra-task` (cvhome-platform + the image, plugin
+and mirror repos), `tools-task` (lcl, load-testing, e2e-testing), `docs-task` (docs site, assets, org profile,
+ideation), `cross-repo-change` (several), `new-repo` (a new org repository), `repo-standard` (the working
+architecture every repo follows), and acts as **reviewer** through `cross-repo-review` for any change in any
+repo (`scripts/impact.py` + `scripts/contract-check.py`). Its `references/` hold the deep repo map, the cross-repo contract table, the
 known documentation drift and the shipping recipe.
 
 | Repo | Kind | One line |
@@ -39,8 +40,12 @@ Rules that hold everywhere:
 - **Sub-repo skills are reachable from here.** Claude Code lists them directory-scoped
   (`cvhome/.claude/skills/project-structure`, `load-testing/.claude/skills/k6`,
   `cvhome-platform/.claude/skills/terraform-*`); invoke them with the Skill tool when working under that path.
-- **`cvhome` edits go in a worktree**, never its primary checkout. `.claude/hooks/subrepo-guard.mjs` here
-  re-applies cvhome's own worktree and push guards when you work from this root.
+- **Every repo works the same way** (`repo-standard`, learned from cvhome): `CLAUDE.md` imports `AGENTS.md`;
+  a fresh worktree per change cut from `origin/main`; a plan is phases and a phase is one PR; `scripts/verify.sh`
+  writes the receipt the push hooks demand; `/go` ships; a QA file per area with `[verified]` tags; a new screen
+  starts in the design portal (`design` skill) and needs an approved `.agents/designs/<slug>.md` before any page
+  file. `.claude/hooks/subrepo-guard.mjs` here re-applies each repo's worktree, design and push guards when you
+  work from this root. `scripts/standard-check.py` says who has adopted it.
 - **Nothing is deployed from `cvhome`'s CI**; images build in CodeBuild and Terraform applies. Do not add
   deploy steps to the app repo.
 - **Never read secret values** (`aws secretsmanager get-secret-value`, `.env` files with real keys).

@@ -30,6 +30,8 @@ scripts/clone.sh cvhome   # just one
 scripts/status.sh         # branch, ahead/behind, dirty count per checkout
 scripts/contract-check.py # do the copies of each cross-repo contract still agree? (nightly in CI too)
 scripts/impact.py <repo>  # what a change in <repo> can break elsewhere, and which checks/questions apply
+scripts/standard-check.py # which repos follow the org repo standard (templates/repo)
+scripts/new-repo.sh       # create a new org repo from the standard and register it here
 ```
 
 ## Working with AI agents here
@@ -38,7 +40,7 @@ Start Claude Code in this directory and describe the task; you do not navigate i
 
 `CLAUDE.md` and `.agents/skills/` make this directory usable as a Claude Code project root. The
 `org-router` skill sends a task to the right repo and to that repo's own conventions; the per-area skills
-(`backend-task`, `infra-task`, `tools-task`, `docs-task`, `cross-repo-change`) and `cross-repo-review` is
+(`fullstack-task`, `infra-task`, `tools-task`, `docs-task`, `cross-repo-change`) and `cross-repo-review` is
 the reviewer that looks across repos before a PR and audits drift after merges say how to work there and what
 must follow in the other repos. `.claude/hooks/subrepo-guard.mjs` re-applies cvhome's worktree and push
 guards when editing from this root.

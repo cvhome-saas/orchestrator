@@ -1,6 +1,6 @@
 ---
 name: org-router
-description: Routes any cvhome-saas task to the right repo(s) and the right per-repo skill. Use FIRST for every task started from the org root (/Volumes/Disk/IdeaProjects/cvhome-saas) before opening files - "add an endpoint", "change a port", "deploy", "why is prod 502", "add a k6 script", "lcl won't start", "update the docs", "new feature idea", or anything ambiguous between backend (cvhome), infra (cvhome-platform + saas-gateway/caddy-domainlookup/aws-otel-collector), tools (lcl, load-testing), and docs (cvhome-saas.github.io, ideation). Classifies the ask, names the owning repo(s), says which repo goes first when several are touched, then hands off to backend-task / infra-task / tools-task / docs-task / cross-repo-change. Also the place to ask "which repo owns X", "what is repo Y for", "what is the image chain for spg".
+description: The cvhome-saas orchestrator's entry point - routes any task to the right repo(s) and skill, and owns everything no single repo can. Use FIRST for every task started from the org root before opening files. Covers the map of the organisation (cvhome full-stack app, cvhome-platform infra, lcl, load-testing, e2e-testing, saas-gateway + caddy-domainlookup + certmagic-s3 + aws-otel-collector + public-dkr images, docs site, assets, ideation) and where a fact lives versus where it is copied. Trigger on "add an endpoint / page / service / pod module", "change a port / env / route / secret", "deploy / release / promote / roll back / cut a version", "why is dev or prod failing", "add a k6 script / e2e test", "lcl won't start", "update the docs / site / profile", "new feature idea", "create a new repo / shared lib / tool", "make repo X follow the conventions / add CLAUDE.md", "review this PR / will this break infra or load-testing", "QA this", "design a new screen", "which repo owns X", "is repo Y still used", "what is the image chain for spg", and anything ambiguous between full-stack, infra, tools and docs. Classifies the ask, ensures the checkouts, splits multi-repo work into one work item per repo, hands off to fullstack-task / infra-task / tools-task / docs-task / cross-repo-change / cross-repo-review / new-repo / repo-standard, and applies the org-wide gates (worktree per change, plan = phases = PRs, verify receipt, QA file, design record, release by tag only).
 ---
 
 # cvhome-saas org router
@@ -8,6 +8,21 @@ description: Routes any cvhome-saas task to the right repo(s) and the right per-
 This directory is the **org checkout**: nine sibling git repos, each with its own rules. Nothing here is
 a Gradle module or a Terraform root; the org repo tracks only `repos.yaml`, the skills, `scripts/` and this
 guidance. **Every real change lands in exactly one sub-repo per commit**, under that repo's own conventions.
+
+## What the orchestrator owns (no single repo can)
+
+| Duty | How | Where |
+|---|---|---|
+| The checkouts: clone, fetch, know what is behind | `scripts/clone.sh`, `scripts/status.sh`, `repos.yaml` | Step 0 |
+| Routing and work division across repos, producers before consumers | this skill, `cross-repo-change` | Steps 1–4 |
+| The cross-repo review: what a change in one repo breaks in another | `cross-repo-review`, `scripts/impact.py`, `scripts/contract-check.py` | Reviewer mode |
+| One working architecture in every repo (AGENTS.md, worktree, plan = phases = PRs, verify receipt, QA file, design record) | `repo-standard`, `templates/repo/`, `scripts/standard-check.py` (nightly), `scripts/standard-apply.sh` | |
+| New repositories in the org, wired into the manifest and the release ring | `new-repo`, `scripts/new-repo.sh` | |
+| Releases: one version, every repo tagged, manifest, promotion PRs | `docs/releasing.md`, `Release` / `Promote` workflows, `scripts/release.py` | never in a sub-repo |
+| QA that crosses repos and QA at a release; keeping `[verified]` honest | `references/qa.md` | |
+| The design gate: a new screen starts in the design portal | `fullstack-task` § Design gate, `design-guard.mjs` | |
+| Standing audit of drift between repos and against the standard | nightly `contract-check.yml` | `references/known-drift.md` |
+| Decisions and their why, across repos | `docs/*.md` here, plans in the owning repo | |
 
 Reference files (read on demand, not all at once):
 
@@ -17,6 +32,7 @@ Reference files (read on demand, not all at once):
 | `references/cross-repo-contracts.md` | The change touches two repos, or a "single fact" (port, service name, image, env var, SLO) that several repos copy |
 | `references/known-drift.md` | Before trusting a repo's own CLAUDE.md/README, or when something "should exist but doesn't" |
 | `references/shipping.md` | You are about to branch, commit, push or open a PR in any repo, or a checkout is missing/behind |
+| `references/qa.md` | The task is "QA this", a release was just cut, a PR changes a user-facing path, or a repo has no QA file |
 
 ## Reviewer mode
 
@@ -47,7 +63,7 @@ Match the **subject** of the task, not the words in it ("deploy the new endpoint
 
 | The task is about | Owner | Hand off to |
 |---|---|---|
-| Java/Spring service code, Angular `console-ui`, Next.js `landing-ui` + themes, `uaa`/`cua` auth, tenancy/pods/billing logic, DDL, `.http` files, unit/integration tests, Gradle/npm build, `common-config.yml` / `lcl-config.yml` / `fargate-config.yml`, `lcl.yml` **of cvhome**, `docker-compose-*.yml`, `extra/monitoring/` (local Prometheus/Grafana/Loki/Tempo), the `spg` **Caddyfile**, cvhome CI workflows, image publish to ECR | **`cvhome/`** | `backend-task` |
+| Java/Spring service code, Angular `console-ui`, Next.js `landing-ui` + themes, `uaa`/`cua` auth, tenancy/pods/billing logic, DDL, `.http` files, unit/integration tests, Gradle/npm build, `common-config.yml` / `lcl-config.yml` / `fargate-config.yml`, `lcl.yml` **of cvhome**, `docker-compose-*.yml`, `extra/monitoring/` (local Prometheus/Grafana/Loki/Tempo), the `spg` **Caddyfile**, cvhome CI workflows, image publish to ECR | **`cvhome/`** | `fullstack-task` |
 | Terraform, CloudFormation bootstrap, ECS/Fargate task defs, Cloud Map, ALB/NLB/Route53/ACM, RDS, S3/CloudFront, IAM for the platform, CodeBuild pipeline, flavours, hibernation, autoscaling, `services.yaml`, cost, "why is prod X", anything `aws` CLI | **`cvhome-platform/`** | `infra-task` |
 | The Caddy **binary/image** (plugins, Go version, xcaddy), the `domain_lookup` middleware, the S3 certificate storage plugin, the ADOT collector config that runs **on AWS**, mirroring an image to public ECR | `saas-gateway/`, `caddy-domainlookup/`, `certmagic-s3/`, `aws-otel-collector/`, `public-dkr/` | `infra-task` (§ helper images) |
 | The `lcl` CLI itself (commands, schema, supervisor, ports, publishing to npm) | **`lcl/`** | `tools-task` |
@@ -58,6 +74,10 @@ Match the **subject** of the task, not the words in it ("deploy the new endpoint
 | A product idea, missing feature, backlog entry, feature spec before any code | `ideation/` | `docs-task` |
 | In-repo docs (`AGENTS.md`, a skill's `references/*.md`, `qa/*.md`, `docs/*.md`) | the repo that owns the code | the owner's skill, docs section |
 | "release", "cut a version", "deploy 2.1.0 to staging", "roll back prod", "bump lcl", tagging, version numbers, changelog | orchestrator | `docs/releasing.md` (runbook) — run the workflow; never tag or bump by hand in a sub-repo |
+| "create a repo", "new shared lib / tool / image / plugin", a plan naming a repo that does not exist | orchestrator | `new-repo` (a new cvhome service is a module, not a repo) |
+| "add CLAUDE.md to X", "make X follow the conventions", a repo with no AGENTS.md, missing hooks or `/go` | the repo, from here | `repo-standard` |
+| "QA this", "is it verified", "run the smoke after the release" | the owning repo's stack | `references/qa.md` |
+| "design a new page / screen", "mock up", a plan phase that adds a UI route | `cvhome` (console-ui, landing-ui, uaa-fe) | `fullstack-task` § Design gate — the `design` skill first, record in `.agents/designs/`, then implement |
 | Two or more of the above, or a fact that is copied across repos | several | `cross-repo-change` |
 
 Disambiguators that recur:
@@ -77,7 +97,7 @@ Disambiguators that recur:
 1. `cd` into the repo (or address it with absolute paths). Its own `CLAUDE.md`/`AGENTS.md` and `.claude/skills/` only apply there. **Read `AGENTS.md` yourself** in `cvhome`, `lcl`, `load-testing`: `CLAUDE.md` is one line (`@AGENTS.md`) and nested auto-loading is not guaranteed from the org root.
 2. Check `references/known-drift.md` for that repo. `cvhome-platform/CLAUDE.md` in particular still says the repo is empty; it is not.
 3. Check `git -C <repo> status` and `git -C <repo> log -5`. Sibling repos advance independently; the local checkout may be behind `origin/main` (`scripts/status.sh`).
-4. Apply the repo's working mode: `cvhome` **requires a worktree** for any edit (`.claude/worktrees/<type>-<name>`, hook-enforced, and the org-level hook re-applies it from here); `lcl` and `load-testing` want a feature branch; `cvhome-platform` merges by PR; the helper image repos have no branch discipline but every push to `main` **publishes an image**.
+4. Apply the working mode — the same everywhere once `repo-standard` has landed there: a worktree per change cut from `origin/main` (`.claude/worktrees/<type>-<name>`, hook-enforced; the org-level hook re-applies it from here), a plan in `.agents/plans/<name>.md` whose phases are the PRs, `scripts/verify.sh` before push, `/go` to ship. `scripts/standard-check.py <repo>` says whether the repo has adopted it; if not, adopt it first or follow it by hand and say so. Every push to `main` in the image and mirror repos **publishes**.
 
 ## Step 3 — order when several repos are involved
 
@@ -101,7 +121,7 @@ Break the task into **work items, one per repo**, each with: repo, branch name (
 every repo), files, gates, and what it depends on. Then:
 
 - **Independent items run in parallel.** Spawn one subagent per repo (Agent tool, `general-purpose` or
-  `fork`), giving it the absolute repo path, the area skill to follow (`backend-task`, `infra-task`,
+  `fork`), giving it the absolute repo path, the area skill to follow (`fullstack-task`, `infra-task`,
   `tools-task`, `docs-task`), the branch name, and the exact deliverable. Read-only investigation across
   repos is also parallel (`Explore` agents). The orchestrator keeps the plan, merges the reports, and does
   not edit files itself while subagents own a repo.
