@@ -1,154 +1,105 @@
-# Manifest of the cvhome-saas GitHub organisation (https://github.com/cvhome-saas).
-# scripts/clone.sh clones every `status: active` repo into this directory; scripts/status.sh
-# reports branch and dirtiness across them. The org-router skill reads `kind` and `status`.
+# Manifest of the cvhome-saas GitHub organisation (https://github.com/cvhome-saas): every public repo,
+# what it is for, and which files to open first. All of them are part of development and are cloned
+# next to this file by scripts/clone.sh (which reads this manifest); scripts/status.sh reports on them;
+# the org-router skill reads `kind` and `usage` to route tasks.
 #
-# kind: app | infra | tool | image | plugin | docs | ideas
-# status: active | deprecated | reference
+# kind: app | infra | tool | image | plugin | docs | ideas | mirror | upstream
+# dir:  local directory name when it differs from the repo name
 org: cvhome-saas
 repos:
   - name: orchestrator
     kind: docs
-    status: active
     url: https://github.com/cvhome-saas/orchestrator.git
-    summary: This repo. The org root that agents start in - repo manifest, clone/status scripts, and the routing skills (org-router, backend-task, infra-task, tools-task, docs-task, cross-repo-change).
+    usage: This repo. The org root that agents start in - repo manifest, clone/status scripts, the routing skills (org-router, backend-task, infra-task, tools-task, docs-task, cross-repo-change) and the reviewer (cross-repo-review, scripts/impact.py, scripts/contract-check.py).
     entry: [CLAUDE.md, repos.yaml, .agents/skills/org-router/SKILL.md]
 
   - name: cvhome
     kind: app
-    status: active
     url: https://github.com/cvhome-saas/cvhome.git
-    summary: The application monorepo. Java 25 / Spring Boot microservices, Angular console-ui, Next.js landing-ui, one Gradle composite build. Source of truth for services and ports (common-config.yml).
+    usage: The application monorepo. Java 25 / Spring Boot microservices, Angular console-ui, Next.js landing-ui, one Gradle composite build. Source of truth for services and ports (common-config.yml). Builds every service image, including store-pod/spg on top of the saas-gateway image.
     entry: [AGENTS.md, .claude/skills/project-structure/SKILL.md, lcl.yml, settings.gradle]
 
   - name: cvhome-platform
     kind: infra
-    status: active
     url: https://github.com/cvhome-saas/cvhome-platform.git
-    summary: AWS infrastructure. Terraform (ECS Fargate, Cloud Map, ALB/NLB, RDS, CloudFront) plus the one-click CloudFormation bootstrap and CodeBuild pipeline. services.yaml mirrors the app catalog and is drift-checked in CI.
+    usage: AWS infrastructure. Terraform (ECS Fargate, Cloud Map, ALB/NLB, RDS, CloudFront) plus the one-click CloudFormation bootstrap and the CodeBuild pipeline that builds cvhome's images and applies. services.yaml mirrors the app catalog and is drift-checked in CI.
     entry: [README.md, CLAUDE.md, services.yaml, flavours.yaml, .claude/plans/infra-implementation-plan.md]
 
   - name: lcl
     kind: tool
-    status: active
     url: https://github.com/cvhome-saas/lcl.git
-    summary: Public npm CLI @cvhome-saas/lcl. Language-neutral local stack runner driven by one lcl.yml. cvhome depends on it; cvhome owns only its lcl.yml.
+    usage: Public npm CLI @cvhome-saas/lcl. Language-neutral local stack runner driven by one lcl.yml. cvhome depends on it; cvhome owns only its lcl.yml. load-testing reads live ports from `lcl urls`.
     entry: [AGENTS.md, README.md, schema/lcl.schema.json]
 
   - name: load-testing
     kind: tool
-    status: active
     url: https://github.com/cvhome-saas/load-testing.git
-    summary: k6 load, stress, soak, breakpoint and browser suite for cvhome. Runs against an lcl stack (TARGET=lcl) or AWS; writes to Prometheus and annotates Grafana.
+    usage: k6 load, stress, soak, breakpoint and browser suite for cvhome. Runs against an lcl stack (TARGET=lcl) or AWS; writes to Prometheus and annotates Grafana. Its thresholds are aligned with the app's SLO histogram buckets.
     entry: [AGENTS.md, README.md, docs/coverage.md, Makefile]
+
+  - name: e2e-testing
+    kind: tool
+    url: https://github.com/cvhome-saas/e2e-testing.git
+    usage: Playwright end-to-end suite for cvhome. Scaffold only so far (default config, one example spec, a Playwright CI workflow); no baseURL, no app journeys yet. The place browser regression tests go when they are written; k6 browser scripts in load-testing cover performance, not correctness.
+    entry: [playwright.config.ts, tests/, .github/workflows/playwright.yml]
 
   - name: saas-gateway
     kind: image
-    status: active
     url: https://github.com/cvhome-saas/saas-gateway.git
-    summary: Caddy base image (xcaddy with certmagic-s3 + caddy-domainlookup) that cvhome/store-pod/spg builds FROM. Publishes to Docker Hub; spg pins a sha tag.
+    usage: Caddy base image (xcaddy with certmagic-s3 + caddy-domainlookup, alpine runtime) that cvhome/store-pod/spg builds FROM. Publishes latest + sha-<short> to Docker Hub on push to main; public-dkr mirrors a chosen sha to public ECR; cvhome pins that sha.
     entry: [Dockerfile, .github/workflows/docker-publish.yml]
 
   - name: caddy-domainlookup
     kind: plugin
-    status: active
     url: https://github.com/cvhome-saas/caddy-domainlookup.git
-    summary: Caddy v2 middleware `domain_lookup` that maps request host to tenant headers via merchant's lookup-by-domain API. Consumed by source path from saas-gateway.
-    entry: [domainlookup.go]
+    usage: Caddy v2 middleware `domain_lookup` that maps the request host to tenant headers (Store-Id, Theme, ...) via merchant's lookup-by-domain API, cached, failing open. Compiled into saas-gateway from source path.
+    entry: [domainlookup.go, go.mod]
+
+  - name: certmagic-s3
+    kind: plugin
+    url: https://github.com/cvhome-saas/certmagic-s3.git
+    usage: Org fork of the certmagic S3 storage backend (aws-sdk-go-v2). Gives Caddy `storage s3 { bucket region prefix endpoint }` so every spg task shares on-demand certificates through the per-pod cert bucket. Compiled into saas-gateway.
+    entry: [storage.go, s3.go, README.md]
 
   - name: aws-otel-collector
     kind: image
-    status: active
     url: https://github.com/cvhome-saas/aws-otel-collector.git
-    summary: ADOT collector image with the project config baked in (OTLP in, X-Ray / EMF / CloudWatch Logs out). One per environment on AWS, referenced from cvhome-platform services.yaml `infra.otel-collector`.
+    usage: ADOT collector image with the project config baked in (OTLP 4317/4318 in; X-Ray, EMF, CloudWatch Logs out; metric prefix filter). One per environment on AWS, referenced from cvhome-platform services.yaml `infra.otel-collector` by :latest.
     entry: [otel-config.yaml, Dockerfile]
+
+  - name: public-dkr
+    kind: mirror
+    url: https://github.com/cvhome-saas/public-dkr.git
+    usage: GitHub Actions matrix that pulls images from Docker Hub / gcr.io and pushes them to the org's public ECR (public.ecr.aws/b2i4h4k9). This is the mirror step between saas-gateway's Docker Hub build and the sha cvhome pins, and it supplies node, postgres, otel-contrib, zipkin, paketo and distroless base images. Add or bump an image = edit the matrix and push main.
+    entry: [.github/workflows/push-images.yml, README.md]
+
+  - name: assets
+    kind: docs
+    url: https://github.com/cvhome-saas/assets.git
+    usage: Static assets served raw from GitHub - fast-run/fast-run.sh and its docker-compose.yml, the one-command evaluation install the docs site links to. Its hosts and image list describe the 1.0.x layout (core-auth, store-ui, welcome-ui, merchant-ui, order); refresh it with the current service catalog before pointing anyone at it.
+    entry: [fast-run/fast-run.sh, fast-run/docker-compose.yml]
 
   - name: cvhome-saas.github.io
     kind: docs
-    status: active
     url: https://github.com/cvhome-saas/cvhome-saas.github.io.git
-    summary: Public VitePress documentation site on GitHub Pages. Content is stale (2025-06) and describes retired repos and services.
+    usage: Public VitePress documentation site on GitHub Pages. Content dates from 2025-06 and describes an older service layout; rewrite from the project-structure skill and cvhome-platform docs.
     entry: [docs/.vitepress/config.mts, docs/guide/architecture-overview.md]
+
+  - name: .github
+    dir: dot-github
+    kind: docs
+    url: https://github.com/cvhome-saas/.github.git
+    usage: Organisation profile README shown on github.com/cvhome-saas (what cvhome is, links to the docs site). Community health defaults for every repo live here too if added.
+    entry: [profile/README.md]
 
   - name: ideation
     kind: ideas
-    status: active
     url: https://github.com/cvhome-saas/ideation.git
-    summary: Product backlog as Markdown feature docs (F-001 .. F-008). Module names in it are aspirational, not the current layout.
+    usage: Product backlog as Markdown feature docs (F-001 .. F-008) with a template and status table. Module names in it are aspirational; map them to the current layout when an idea becomes a plan.
     entry: [README.md, features/]
 
-  # ---- Deprecated / superseded. Never extend; clone only to read history. ----
-  - name: cvhome-infra
-    kind: infra
-    status: deprecated
-    url: https://github.com/cvhome-saas/cvhome-infra.git
-    summary: Legacy Terraform. Replaced by cvhome-platform.
-  - name: cvhome-bootstrap
-    kind: infra
-    status: deprecated
-    url: https://github.com/cvhome-saas/cvhome-bootstrap.git
-    summary: Legacy CloudFormation bootstrap. Replaced by cvhome-platform/bootstrap/bootstrap.yaml.
-  - name: cvhome-store-pod
-    kind: infra
-    status: deprecated
-    url: https://github.com/cvhome-saas/cvhome-store-pod.git
-    summary: Legacy per-pod Terraform. Replaced by cvhome-platform/modules/store-pod.
-  - name: cvhome-store-pod-infra
-    kind: infra
-    status: deprecated
-    url: https://github.com/cvhome-saas/cvhome-store-pod-infra.git
-    summary: Older private variant of the pod infra. Replaced by cvhome-platform.
-  - name: cvhome-secrets
-    kind: infra
-    status: deprecated
-    url: https://github.com/cvhome-saas/cvhome-secrets.git
-    summary: Dropped entirely; secrets now come from the bootstrap CFN + Secrets Manager.
-  - name: cvhome-common-ecs-service
-    kind: infra
-    status: deprecated
-    url: https://github.com/cvhome-saas/cvhome-common-ecs-service.git
-    summary: Was to survive as a tag-pinned external module; instead absorbed as cvhome-platform/modules/ecs-service.
-  - name: eureka-peers
-    kind: app
-    status: deprecated
-    url: https://github.com/cvhome-saas/eureka-peers.git
-    summary: Eureka-based discovery, replaced by Cloud Map (ecs-service-discoveryclient) and lb://.
-  - name: aws-consul
-    kind: infra
-    status: deprecated
-    url: https://github.com/cvhome-saas/aws-consul.git
-    summary: Consul experiment, superseded by Cloud Map.
-  - name: load-testing-x
-    kind: tool
-    status: deprecated
-    url: https://github.com/cvhome-saas/load-testing-x.git
-    summary: Earlier load-testing attempt, replaced by load-testing.
-  - name: e2e-testing
-    kind: tool
-    status: reference
-    url: https://github.com/cvhome-saas/e2e-testing.git
-    summary: TypeScript e2e suite, last pushed 2026-01. Not wired to the current stack; treat as reference until revived.
-  - name: certmagic-s3
-    kind: plugin
-    status: reference
-    url: https://github.com/cvhome-saas/certmagic-s3.git
-    summary: Org fork of the certmagic S3 storage plugin, built into saas-gateway. Not checked out locally.
-  - name: public-dkr
-    kind: image
-    status: reference
-    url: https://github.com/cvhome-saas/public-dkr.git
-    summary: Public image mirroring; likely where Docker Hub images get pushed to public ECR. Unverified.
-  - name: assets
-    kind: docs
-    status: reference
-    url: https://github.com/cvhome-saas/assets.git
-    summary: Static assets (fast-run.sh referenced by the docs site).
   - name: shopizer
-    kind: app
-    status: reference
+    kind: upstream
     url: https://github.com/cvhome-saas/shopizer.git
-    summary: Upstream fork cvhome evolved from. History only.
-  - name: .github
-    kind: docs
-    status: reference
-    url: https://github.com/cvhome-saas/.github.git
-    summary: Org profile / community health files.
+    usage: The Shopizer 3.2.7 fork cvhome evolved from (Java 17, Maven, sm-core / sm-shop). Read-only reference for domain concepts and legacy behaviour when a cvhome module still mirrors it; nothing is built or deployed from it.
+    entry: [README.md, sm-core/, sm-shop/]

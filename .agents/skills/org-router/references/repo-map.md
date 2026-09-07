@@ -1,6 +1,7 @@
-# Repo map — the nine active checkouts
+# Repo map — the sixteen org repos
 
-Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Each repo's own
+Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. All of them are cloned by
+`scripts/clone.sh` (`repos.yaml` is the list). Each repo's own
 `AGENTS.md`/`CLAUDE.md` is authoritative for how to work *inside* it; this file is the cross-repo view.
 
 ## cvhome — the application (kind: app)
@@ -121,9 +122,9 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Ea
   --with github.com/cvhome-saas/caddy-domainlookup`; `alpine:3.19` runtime with `cap_net_bind_service`.
 - **Publish**: `.github/workflows/docker-publish.yml` on push to main → Docker Hub
   `${DOCKERHUB_USERNAME}/saas-gateway:latest` + `sha-<short>`, multi-arch.
-- **Consumer**: `cvhome/store-pod/spg/Dockerfile` (`FROM public.ecr.aws/b2i4h4k9/ashraf1abdelrasool/saas-gateway:sha-8eed986`)
-  and `cvhome/docker-compose-lcl.yml` (`ashraf1abdelrasool/saas-gateway:sha-4a6d381`). The public-ECR mirror
-  step is not in any checked-out repo (probably `public-dkr`).
+- **Consumer**: `cvhome/store-pod/spg/Dockerfile` and `spg/compose.yml` (`FROM public.ecr.aws/b2i4h4k9/ashraf1abdelrasool/saas-gateway:sha-8eed986`)
+  and `cvhome/docker-compose-lcl.yml` (`ashraf1abdelrasool/saas-gateway:sha-4a6d381` from Docker Hub). The
+  Docker Hub → public ECR step is `public-dkr`'s matrix, which currently carries `sha-8eed986`.
 - **Rule**: bump the pin in cvhome deliberately after a rebuild; a push to main here changes nothing until the
   pin moves. `README.md` names the wrong certmagic-s3 upstream.
 
@@ -166,3 +167,66 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Ea
 - **State**: 2 commits, nothing started; module names (`seller-ui`, `search-service`, `analytics-service`)
   are aspirational. When an idea becomes work, the plan goes to `cvhome/.agents/plans/<name>.md` and the
   ideation row gets a link and status, not the other way round.
+
+## public-dkr — public ECR mirror (kind: mirror)
+
+- **What**: one workflow, `.github/workflows/push-images.yml`: a matrix of `registry/image:tag` pulled from Docker
+  Hub or gcr.io and pushed to `public.ecr.aws/<alias>/<image>:<tag>` (alias `b2i4h4k9`), creating the ECR
+  public repo if needed. Runs on push to `main` and manually. Needs the repo's `AWS_ACCESS_KEY_ID` /
+  `AWS_SECRET_ACCESS_KEY` secrets (us-east-1).
+- **Matrix today**: `node:20.15.0-alpine`, `node:20-slim`, `postgres:15-alpine`,
+  `ashraf1abdelrasool/saas-gateway:sha-8eed986`, `otel/opentelemetry-collector-contrib:0.139.0`,
+  `openzipkin/zipkin:3`, `paketobuildpacks/ubuntu-noble-run-tiny:0.0.67`,
+  `paketobuildpacks/builder-noble-java-tiny:latest`, `gcr.io/distroless/nodejs20:latest`.
+- **Consumers**: `cvhome/store-core/console-ui/Dockerfile` (node alpine), `cvhome/store-pod/landing-ui/Dockerfile`
+  (distroless nodejs20), `cvhome/store-pod/spg/{Dockerfile,compose.yml}` (saas-gateway), buildpack run/builder
+  images via `bootBuildImage`. `contract-check.py public-ecr` verifies every `FROM public.ecr.aws/...` in cvhome
+  is in the matrix.
+- **Rule**: the matrix is the only record of what the public registry holds. `README.md` lists two images; trust the
+  workflow.
+
+## certmagic-s3 — Caddy certificate storage plugin (kind: plugin, Go)
+
+- **What**: org fork of the certmagic generic-S3 storage backend, moved to `aws-sdk-go-v2`. Registers Caddy
+  `storage s3 { bucket region prefix endpoint }` (`storage.go` `UnmarshalCaddyfile`; default prefix
+  `certmagic`), with `io.go`/`s3.go` doing get/put/list/stat/delete and locking. Optional client-side
+  secretbox encryption per the README.
+- **Consumer**: compiled into `saas-gateway` (`xcaddy build --with github.com/cvhome-saas/certmagic-s3`); used by
+  `cvhome/store-pod/spg/Caddyfile` `storage s3 { bucket {$CERT_BUCKET} region {$CERT_BUCKET_REGION} }` so every
+  spg task in a pod shares on-demand certificates through the per-pod cert bucket that
+  `cvhome-platform/modules/store-pod/storage.tf` creates and grants.
+- **Build**: `.github/workflows/go-build.yml` builds only. `go.mod` pins caddy 2.7.6, Go 1.23 (toolchain
+  1.24.2); the real build is saas-gateway's Go 1.25.
+
+## e2e-testing — Playwright suite (kind: tool)
+
+- **What**: Playwright ≥1.57 scaffold: `playwright.config.ts` (chromium project, html reporter, retries on CI,
+  no `baseURL`), `tests/example.spec.ts` (hits playwright.dev), `.github/workflows/playwright.yml` (push/PR,
+  `npx playwright test`, uploads the report). No app journeys yet.
+- **Role**: browser **correctness** regression for cvhome flows (login, storefront, checkout, console). Performance
+  and web vitals stay in `load-testing/k6/scripts/browser/`; human QA scripts stay in `cvhome/<service>/qa/`.
+- **Run**: `npm i && npx playwright install --with-deps && npx playwright test`, against `lcl start -d` in
+  `cvhome` with `baseURL` from env / `lcl urls`.
+
+## assets — evaluation install (kind: docs)
+
+- **What**: `fast-run/fast-run.sh` (root-only: writes `/etc/hosts`, pulls images, runs the compose file) and
+  `fast-run/docker-compose.yml`, served raw from GitHub and linked by the docs site as the quick start.
+- **State**: describes the 1.0.x layout (`core-auth`, `store-ui`, `welcome-ui`, `merchant-ui`, `order`, RabbitMQ,
+  MinIO, registry `public.ecr.aws/g0a5h6c1/1691275173`) — hosts and services that the current catalog does not
+  have. A refresh must be generated from `common-config.yml`, `configure-domain.sh`, `docker-compose-lcl.yml`
+  and the images cvhome's public-ECR workflow publishes, and tested on a clean Docker host.
+
+## dot-github — org profile (`.github` repo, kind: docs)
+
+- **What**: `profile/README.md`, the text shown on github.com/cvhome-saas (what cvhome is, what the org holds,
+  link to the docs site). Checked out as `dot-github/` because a dotfile directory would be invisible in listings.
+- **Rule**: keep its claims consistent with `repos.yaml` and the docs site; community-health defaults for all
+  repos (issue templates, CODEOWNERS) would live here if introduced.
+
+## shopizer — upstream (kind: upstream, read-only)
+
+- **What**: Shopizer 3.2.7 (Java 17, Maven; `sm-core`, `sm-core-model`, `sm-core-modules`, `sm-shop`,
+  `sm-shop-model`), the codebase cvhome evolved from. Branch `3.2.7`.
+- **Use**: reference for domain concepts and legacy behaviour when a cvhome module still mirrors it (merchant store,
+  catalog, order, customer). Nothing is built, tested or deployed from it, and it is never edited.

@@ -12,7 +12,7 @@ off to `backend-task` (cvhome), `infra-task` (cvhome-platform + saas-gateway / c
 aws-otel-collector), `tools-task` (lcl, load-testing), `docs-task` (cvhome-saas.github.io, ideation) or
 `cross-repo-change` (several), and acts as **reviewer** through `cross-repo-review` for any change in any repo
 (`scripts/impact.py` + `scripts/contract-check.py`). Its `references/` hold the deep repo map, the cross-repo contract table, the
-known documentation drift and the deprecated-repo list.
+known documentation drift and the shipping recipe.
 
 | Repo | Kind | One line |
 |---|---|---|
@@ -20,11 +20,17 @@ known documentation drift and the deprecated-repo list.
 | `cvhome-platform/` | infra | Terraform + CloudFormation bootstrap for ECS Fargate; `services.yaml` mirrors the app catalog |
 | `lcl/` | tool | Public npm CLI that runs the local stack from `lcl.yml` |
 | `load-testing/` | tool | k6 suite against an lcl stack or AWS |
-| `saas-gateway/` | image | Caddy binary/image that `cvhome/store-pod/spg` builds FROM |
+| `saas-gateway/` | image | Caddy binary/image that `cvhome/store-pod/spg` builds FROM (via public-dkr) |
 | `caddy-domainlookup/` | plugin | Caddy middleware compiled into saas-gateway |
 | `aws-otel-collector/` | image | ADOT collector config for AWS environments |
 | `cvhome-saas.github.io/` | docs | Public VitePress site (stale) |
+| `e2e-testing/` | tool | Playwright browser regression suite (scaffold) |
+| `certmagic-s3/` | plugin | Caddy S3 certificate storage compiled into saas-gateway |
+| `public-dkr/` | mirror | Pushes Docker Hub / gcr images to the org's public ECR; the allow-list of base images |
+| `assets/` | docs | `fast-run.sh` one-command evaluation install, served raw from GitHub |
+| `dot-github/` | docs | Org profile README (`.github` repo) |
 | `ideation/` | ideas | Product backlog as Markdown |
+| `shopizer/` | upstream | The fork cvhome evolved from; read-only reference |
 
 Rules that hold everywhere:
 
@@ -39,8 +45,8 @@ Rules that hold everywhere:
 - **Nothing is deployed from `cvhome`'s CI**; images build in CodeBuild and Terraform applies. Do not add
   deploy steps to the app repo.
 - **Never read secret values** (`aws secretsmanager get-secret-value`, `.env` files with real keys).
-- **Do not extend deprecated repos** (`cvhome-infra`, `cvhome-bootstrap`, `cvhome-secrets`,
-  `cvhome-store-pod*`, `cvhome-common-ecs-service`, `eureka-peers`, `aws-consul`, `load-testing-x`).
+- **`shopizer/` is read-only.** Everything else is live: a push to `main` in the image and mirror repos
+  publishes; `assets/` is served raw from GitHub the moment it moves.
 - **Checkouts are managed, not assumed.** `repos.yaml` holds every repo URL; `scripts/clone.sh <repo>`
   clones a missing one or fetches and reports behind/ahead. Run it for each repo a task touches before
   reading code there. `scripts/status.sh` shows all of them.

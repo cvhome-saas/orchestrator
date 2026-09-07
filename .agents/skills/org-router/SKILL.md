@@ -1,6 +1,6 @@
 ---
 name: org-router
-description: Routes any cvhome-saas task to the right repo(s) and the right per-repo skill. Use FIRST for every task started from the org root (/Volumes/Disk/IdeaProjects/cvhome-saas) before opening files - "add an endpoint", "change a port", "deploy", "why is prod 502", "add a k6 script", "lcl won't start", "update the docs", "new feature idea", or anything ambiguous between backend (cvhome), infra (cvhome-platform + saas-gateway/caddy-domainlookup/aws-otel-collector), tools (lcl, load-testing), and docs (cvhome-saas.github.io, ideation). Classifies the ask, names the owning repo(s), says which repo goes first when several are touched, then hands off to backend-task / infra-task / tools-task / docs-task / cross-repo-change. Also the place to ask "which repo owns X", "is repo Y deprecated", "what is the image chain for spg".
+description: Routes any cvhome-saas task to the right repo(s) and the right per-repo skill. Use FIRST for every task started from the org root (/Volumes/Disk/IdeaProjects/cvhome-saas) before opening files - "add an endpoint", "change a port", "deploy", "why is prod 502", "add a k6 script", "lcl won't start", "update the docs", "new feature idea", or anything ambiguous between backend (cvhome), infra (cvhome-platform + saas-gateway/caddy-domainlookup/aws-otel-collector), tools (lcl, load-testing), and docs (cvhome-saas.github.io, ideation). Classifies the ask, names the owning repo(s), says which repo goes first when several are touched, then hands off to backend-task / infra-task / tools-task / docs-task / cross-repo-change. Also the place to ask "which repo owns X", "what is repo Y for", "what is the image chain for spg".
 ---
 
 # cvhome-saas org router
@@ -16,7 +16,6 @@ Reference files (read on demand, not all at once):
 | `references/repo-map.md` | You need the deep map of a repo: entry docs, layout, build/test, CI, what it publishes, who consumes it |
 | `references/cross-repo-contracts.md` | The change touches two repos, or a "single fact" (port, service name, image, env var, SLO) that several repos copy |
 | `references/known-drift.md` | Before trusting a repo's own CLAUDE.md/README, or when something "should exist but doesn't" |
-| `references/deprecated-repos.md` | A task or doc names a repo not checked out here |
 | `references/shipping.md` | You are about to branch, commit, push or open a PR in any repo, or a checkout is missing/behind |
 
 ## Reviewer mode
@@ -29,7 +28,8 @@ the orchestrator opens gets this review first (`references/shipping.md` § 2).
 
 ## Step 0 — the checkouts
 
-Every org repo, its URL, kind and status is in `repos.yaml` at the org root. The router owns the checkouts:
+Every org repo, its URL, kind and usage is in `repos.yaml` at the org root — sixteen repos, all of them part
+of development. The router owns the checkouts:
 
 ```bash
 cd /Volumes/Disk/IdeaProjects/cvhome-saas
@@ -39,8 +39,7 @@ scripts/status.sh                      # branch, ahead/behind, dirty count for e
 
 Run it for each repo the task will touch **before** reading code there: a stale `main` produces a plan
 against code that no longer exists. Fast-forward a clean, behind `main` with `git -C <repo> pull --ff-only`.
-A repo with `status: deprecated` is cloned only on explicit request (`scripts/clone.sh <name>` works for any
-status) and never edited.
+`.github` is checked out as `dot-github/` (manifest `dir:`); `shopizer` is read-only upstream reference.
 
 ## Step 1 — classify the ask
 
@@ -50,10 +49,13 @@ Match the **subject** of the task, not the words in it ("deploy the new endpoint
 |---|---|---|
 | Java/Spring service code, Angular `console-ui`, Next.js `landing-ui` + themes, `uaa`/`cua` auth, tenancy/pods/billing logic, DDL, `.http` files, unit/integration tests, Gradle/npm build, `common-config.yml` / `lcl-config.yml` / `fargate-config.yml`, `lcl.yml` **of cvhome**, `docker-compose-*.yml`, `extra/monitoring/` (local Prometheus/Grafana/Loki/Tempo), the `spg` **Caddyfile**, cvhome CI workflows, image publish to ECR | **`cvhome/`** | `backend-task` |
 | Terraform, CloudFormation bootstrap, ECS/Fargate task defs, Cloud Map, ALB/NLB/Route53/ACM, RDS, S3/CloudFront, IAM for the platform, CodeBuild pipeline, flavours, hibernation, autoscaling, `services.yaml`, cost, "why is prod X", anything `aws` CLI | **`cvhome-platform/`** | `infra-task` |
-| The Caddy **binary/image** (plugins, Go version, xcaddy), the `domain_lookup` middleware, the ADOT collector config that runs **on AWS** | `saas-gateway/`, `caddy-domainlookup/`, `aws-otel-collector/` | `infra-task` (§ helper images) |
+| The Caddy **binary/image** (plugins, Go version, xcaddy), the `domain_lookup` middleware, the S3 certificate storage plugin, the ADOT collector config that runs **on AWS**, mirroring an image to public ECR | `saas-gateway/`, `caddy-domainlookup/`, `certmagic-s3/`, `aws-otel-collector/`, `public-dkr/` | `infra-task` (§ helper images) |
 | The `lcl` CLI itself (commands, schema, supervisor, ports, publishing to npm) | **`lcl/`** | `tools-task` |
 | k6 scripts, clients, journeys, thresholds, fixtures, Prometheus/Grafana for load tests, `make` targets | **`load-testing/`** | `tools-task` |
-| The public docs site (VitePress), org README, architecture pages | `cvhome-saas.github.io/` | `docs-task` |
+| Playwright browser regression tests (correctness, not performance) | **`e2e-testing/`** | `tools-task` |
+| The public docs site (VitePress), architecture pages | `cvhome-saas.github.io/` | `docs-task` |
+| The org profile on github.com/cvhome-saas, the one-command evaluation install (`fast-run.sh`) | `dot-github/`, `assets/` | `docs-task` |
+| "How did Shopizer do X", legacy behaviour a cvhome module still mirrors | `shopizer/` (read-only) | the owner's skill; never edit shopizer |
 | A product idea, missing feature, backlog entry, feature spec before any code | `ideation/` | `docs-task` |
 | In-repo docs (`AGENTS.md`, a skill's `references/*.md`, `qa/*.md`, `docs/*.md`) | the repo that owns the code | the owner's skill, docs section |
 | Two or more of the above, or a fact that is copied across repos | several | `cross-repo-change` |
@@ -62,7 +64,9 @@ Disambiguators that recur:
 
 - **"Port" / "service name" / "new service"** → the fact lives in `cvhome/store-commons/autoconfigure/src/main/resources/common-config.yml`; `cvhome-platform/services.yaml`, `cvhome/lcl.yml`, `load-testing/k6/config/env/lcl.json` mirror it. Always `cross-repo-change`.
 - **"Observability"** splits three ways: app instrumentation and local Grafana → `cvhome` (`common-config.yml` otel block, `extra/monitoring/`); the AWS collector image → `aws-otel-collector`; whether a flavour runs a collector and Container Insights → `cvhome-platform` (`flavours.yaml` `monitoring`, `services.yaml` `infra.otel-collector`).
-- **"spg" / "gateway" / "custom domain / TLS"**: Caddyfile and routes → `cvhome/store-pod/spg`; the Caddy binary → `saas-gateway` (+ `caddy-domainlookup`); the NLB, cert bucket, `ASK_TLS_URL`/`CERT_BUCKET` env → `cvhome-platform/modules/store-pod`. The Spring `store-core-gateway` is plain `cvhome` code.
+- **"spg" / "gateway" / "custom domain / TLS"**: Caddyfile and routes → `cvhome/store-pod/spg`; the Caddy binary → `saas-gateway` (+ `caddy-domainlookup`, `certmagic-s3`); getting a new binary in front of spg → `public-dkr` matrix then the pin in cvhome; the NLB, cert bucket, `ASK_TLS_URL`/`CERT_BUCKET` env → `cvhome-platform/modules/store-pod`. The Spring `store-core-gateway` is plain `cvhome` code.
+- **"Base image" / "image not found in public ECR"** → `public-dkr` (the matrix is the allow-list of what exists at `public.ecr.aws/b2i4h4k9`).
+- **"Browser test" / "e2e"**: correctness → `e2e-testing` (Playwright); performance/web vitals → `load-testing` browser scripts; manual QA scripts → `cvhome/<service>/qa/*.md`.
 - **"Run the stack" / "lcl won't start"**: a bug in the runner → `lcl`; a bad `lcl.yml`, a service failing its health check, hosts entries → `cvhome` (`qa/lcl-qa.md`, `references/qa-testing.md`).
 - **"Deploy"**: images are built by CodeBuild from the app repo and applied by Terraform; there is **no** deploy workflow in `cvhome`. Deploy questions go to `infra-task`; "my change is not in the image" starts in `cvhome` (`build.gradle` `imageName`, `bootBuildImage`) then `cvhome-platform` (`services.yaml` `image`, drift check).
 - **"Secrets"**: app-side encryption of tenant secrets (`secret-crypto`) → `cvhome`; Secrets Manager entries, bootstrap-generated secrets, ECS secret bindings → `cvhome-platform`. Never read a secret value into context (`aws secretsmanager get-secret-value` is off-limits; see cvhome-platform `CLAUDE.md` § Secret Safety).
@@ -81,7 +85,8 @@ Producers before consumers. The contract graph (details in `references/cross-rep
 
 ```
 caddy-domainlookup ─┐
-certmagic-s3 ───────┴─► saas-gateway (image) ─► cvhome/store-pod/spg (FROM sha-…) ─► cvhome-platform (pod.spg)
+certmagic-s3 ───────┴─► saas-gateway (Docker Hub sha-…) ─► public-dkr (mirror to public ECR) ─► cvhome/store-pod/spg (FROM) ─► cvhome-platform (pod.spg)
+public-dkr also mirrors node / postgres / otel-contrib / paketo base images that cvhome Dockerfiles and buildpacks pull
 aws-otel-collector (image) ────────────────────────────────────────────────────► cvhome-platform (infra.otel-collector)
 cvhome common-config.yml ─► cvhome lcl.yml ─► lcl (runs it) ─► load-testing lcl.json (targets it)
 cvhome common-config.yml / fargate-config.yml / build.gradle ─► cvhome-platform services.yaml (drift-checked in CI)

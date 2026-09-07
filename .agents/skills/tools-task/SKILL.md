@@ -1,9 +1,9 @@
 ---
 name: tools-task
-description: How to execute a task on the cvhome-saas developer tools - the lcl local stack runner CLI (@cvhome-saas/lcl - commands, lcl.yml schema, supervisor, ports, Compose, health checks, npm publishing) and the load-testing k6 suite (scripts, clients, journeys, thresholds, fixtures, Prometheus/Grafana wiring, make targets, baselines). Use after org-router sends the task to tools, or when the task names lcl (the CLI, not a project's lcl.yml), k6, load/stress/soak/breakpoint tests, TESTID, thresholds, fixtures or the load dashboard. Separates "bug in the tool" from "bug in cvhome's use of the tool".
+description: How to execute a task on the cvhome-saas developer tools - the lcl local stack runner CLI (@cvhome-saas/lcl - commands, lcl.yml schema, supervisor, ports, Compose, health checks, npm publishing), the load-testing k6 suite (scripts, clients, journeys, thresholds, fixtures, Prometheus/Grafana wiring, make targets, baselines) and the e2e-testing Playwright suite (browser regression tests). Use after org-router sends the task to tools, or when the task names lcl (the CLI, not a project's lcl.yml), k6, load/stress/soak/breakpoint tests, TESTID, thresholds, fixtures, the load dashboard, Playwright or e2e. Separates "bug in the tool" from "bug in cvhome's use of the tool".
 ---
 
-# Tools task → `lcl/` or `load-testing/`
+# Tools task → `lcl/`, `load-testing/` or `e2e-testing/`
 
 ## First: is it the tool or the consumer?
 
@@ -12,6 +12,7 @@ description: How to execute a task on the cvhome-saas developer tools - the lcl 
 | `lcl` crashes, mis-allocates ports, leaves orphans, wrong `status`, schema rejects a valid key, a new command | `lcl/` |
 | cvhome's stack fails a health check, a service is missing from `lcl.yml`, hosts entries, "which port is X on" | `cvhome/` (`lcl.yml`, `qa/lcl-qa.md`, `references/qa-testing.md`) → `backend-task` |
 | A k6 script, client, journey, threshold, fixture, the run wrapper, Grafana annotation | `load-testing/` |
+| A browser regression test (does the checkout flow still work?), Playwright config/CI | `e2e-testing/` |
 | k6 finds a real defect or the app needs OTEL/Hikari/metrics changes to be measurable | `cvhome/` → `backend-task`; note it in `load-testing/README.md` prerequisites table |
 | Sizing/RDS pool after a load finding | `cvhome-platform/` → `infra-task` |
 
@@ -62,3 +63,21 @@ npm test                                  # eslint, prettier, markdownlint, shel
 
 Numbers go to `docs/baseline.md`; dashboards live in `cvhome/extra/monitoring/grafana/dashboards/load-testing`
 (so a dashboard change is a `cvhome` PR). `make dash` opens `/d/cvhome-load-test-vs-app`.
+
+## `e2e-testing/` — Playwright
+
+A scaffold today: default `playwright.config.ts` (chromium only, html reporter, no `baseURL`), one example spec,
+`.github/workflows/playwright.yml` on push/PR. When adding real journeys:
+- Target the same stack as load-testing: `cd ../cvhome && lcl start -d`, read hosts/ports from `lcl urls`,
+  demo logins from `cvhome/.claude/skills/project-structure/references/qa-testing.md`; set `baseURL` from
+  env, never hardcode a port (stacks shift by +1000·k).
+- One spec file per user-facing flow, named after the cvhome service that owns the entry point; keep the
+  manual case in `cvhome/<service>/qa/<svc>-qa.md` and mark it **[verified]** by this spec.
+- Never create data outside `e2e-…` prefixed names; reuse the seeded demo stores read-only.
+- The CI workflow has no stack to run against; it passes vacuously until a `services:` job or an `lcl`-in-CI
+  step exists. Say so rather than treating green as coverage.
+
+```bash
+cd /Volumes/Disk/IdeaProjects/cvhome-saas/e2e-testing
+npm i && npx playwright install --with-deps && npx playwright test
+```

@@ -13,7 +13,7 @@ and after any change in any repo, and what a PR in one repo cannot see about the
     scripts/contract-check.py --cvhome /path/to/cvhome/.claude/worktrees/feat-x   # review a branch/PR worktree
     scripts/contract-check.py --cvhome-platform /path/to/platform-worktree
 
-Any repo path can be overridden (--cvhome, --cvhome-platform, --load-testing, --lcl, --saas-gateway) so the
+Any repo path can be overridden (--cvhome, --cvhome-platform, --load-testing, --lcl, --saas-gateway, --public-dkr) so the
 reviewer can evaluate a proposed change (a worktree, a `gh pr checkout`) against the other repos' main.
 
 Exit 0 = no failures (warnings allowed), 1 = at least one FAIL, 2 = a required checkout is missing.
@@ -32,18 +32,18 @@ import sys
 from pathlib import Path
 
 ORG = Path(__file__).resolve().parent.parent
-APP = PLATFORM = LOAD = LCL = GATEWAY_IMG = Path()
+APP = PLATFORM = LOAD = LCL = GATEWAY_IMG = MIRROR = Path()
 COMMON_CONFIG = FARGATE_CONFIG = LCL_YML = CADDYFILE = SPG_DOCKERFILE = COMPOSE_LCL = GATEWAY_ROUTES = Path()
 SERVICES_YAML = BOOTSTRAP = DRIFT_SCRIPT = LCL_JSON = THRESHOLDS = K6_CLIENTS = K6_LIB = Path()
 
 
 def bind_paths(overrides: dict[str, str]) -> None:
     """Resolve every file the checks read, honouring --<repo> path overrides."""
-    global APP, PLATFORM, LOAD, LCL, GATEWAY_IMG
+    global APP, PLATFORM, LOAD, LCL, GATEWAY_IMG, MIRROR
     global COMMON_CONFIG, FARGATE_CONFIG, LCL_YML, CADDYFILE, SPG_DOCKERFILE, COMPOSE_LCL, GATEWAY_ROUTES
     global SERVICES_YAML, BOOTSTRAP, DRIFT_SCRIPT, LCL_JSON, THRESHOLDS, K6_CLIENTS, K6_LIB
-    pick = lambda name: Path(overrides.get(name) or ORG / name).resolve()
-    APP, PLATFORM, LOAD, LCL, GATEWAY_IMG = (pick(n) for n in ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway"))
+    pick = lambda name: Path(overrides.get(name) or overrides.get(name.replace("-", "_")) or ORG / name).resolve()
+    APP, PLATFORM, LOAD, LCL, GATEWAY_IMG, MIRROR = (pick(n) for n in ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway", "public-dkr"))
     COMMON_CONFIG = APP / "store-commons/autoconfigure/src/main/resources/common-config.yml"
     FARGATE_CONFIG = APP / "store-commons/autoconfigure/src/main/resources/fargate-config.yml"
     LCL_YML = APP / "lcl.yml"
@@ -386,6 +386,32 @@ def check_spg_pin() -> None:
         report(c, "OK", f"spg pins saas-gateway:{dtag} everywhere and it is saas-gateway HEAD")
 
 
+def check_public_ecr() -> None:
+    """Every public.ecr.aws/<alias>/<image>:<tag> cvhome pulls is in public-dkr's mirror matrix."""
+    c = "public-ecr"
+    matrix = MIRROR / ".github/workflows/push-images.yml"
+    if not need(matrix, c):
+        return
+    text = matrix.read_text()
+    mirrored = {(i, tg) for i, tg in re.findall(r"image:\s*(\S+)\n\s+tag:\s*(\S+)", text)}
+    refs: dict[tuple[str, str], list[str]] = {}
+    for path in [*APP.glob("store-*/*/Dockerfile"), *APP.glob("store-*/*/compose.yml"), COMPOSE_LCL, SPG_DOCKERFILE]:
+        if not path.exists():
+            continue
+        for image, tag in re.findall(r"public\.ecr\.aws/[a-z0-9]+/([A-Za-z0-9_./-]+):([A-Za-z0-9_.-]+)", path.read_text()):
+            refs.setdefault((image, tag), []).append(str(path.relative_to(APP)))
+    missing = [f"{i}:{t} ({', '.join(sorted(set(files)))})" for (i, t), files in sorted(refs.items()) if (i, t) not in mirrored]
+    if missing:
+        report(c, "FAIL", "cvhome pulls public-ECR images that public-dkr never mirrored: " + "; ".join(missing),
+               "add the image/tag to public-dkr's push-images.yml matrix and push main")
+    else:
+        report(c, "OK", f"all {len(refs)} public-ECR image references in cvhome are in public-dkr's mirror matrix")
+    gw = [tg for i, tg in mirrored if i.endswith("saas-gateway")]
+    d = re.search(r"saas-gateway:(\S+)", SPG_DOCKERFILE.read_text()) if SPG_DOCKERFILE.exists() else None
+    if d and gw and d.group(1) not in gw:
+        report(c, "FAIL", f"spg Dockerfile pins saas-gateway:{d.group(1)} but public-dkr mirrors {gw}")
+
+
 def check_slo() -> None:
     """k6 p95 thresholds must be bucket boundaries of the app's http.server.requests SLO histogram."""
     c = "slo"
@@ -477,6 +503,7 @@ CHECKS = {
     "edges": check_edges,
     "env": check_env,
     "spg-image": check_spg_pin,
+    "public-ecr": check_public_ecr,
     "slo": check_slo,
     "load-testing": check_load_env,
     "lcl-schema": check_lcl_validate,
@@ -488,10 +515,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--only", help="comma-separated subset of: " + ",".join(CHECKS))
-    for repo in ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway"):
-        ap.add_argument(f"--{repo}", dest=repo, help=f"path to use instead of ./{repo} (a worktree or PR checkout)")
+    repos = ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway", "public-dkr")
+    for repo in repos:
+        ap.add_argument(f"--{repo}", dest=repo.replace("-", "_"), help=f"path to use instead of ./{repo} (a worktree or PR checkout)")
     args = ap.parse_args()
-    bind_paths({r: getattr(args, r) for r in ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway")})
+    bind_paths({r: getattr(args, r.replace("-", "_")) for r in repos})
     selected = args.only.split(",") if args.only else list(CHECKS)
     for name in selected:
         if name not in CHECKS:

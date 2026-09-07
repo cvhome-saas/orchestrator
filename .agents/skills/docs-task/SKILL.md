@@ -17,11 +17,13 @@ description: How to execute a documentation or product-idea task for cvhome-saas
 | Load numbers and coverage | `load-testing/docs/{baseline,coverage,prometheus}.md`, `README.md` | `results/`, `k6/lib/clients` |
 | Product ideas, missing features | `ideation/README.md` table + `features/F-NNN-<slug>.md` | the existing F-docs template |
 | Org overview, repo list, routing | this repo: `README.md`, `repos.yaml`, `.agents/skills/org-router/references/*` | `gh repo list cvhome-saas`, each repo's entry docs |
+| Org profile on github.com/cvhome-saas | `dot-github/profile/README.md` | the docs site and `repos.yaml` |
+| One-command evaluation install | `assets/fast-run/{fast-run.sh,docker-compose.yml}` (served raw from GitHub, linked by the site) | `cvhome/docker-compose-lcl.yml`, `common-config.yml`, `public-dkr` matrix for image names |
 
 ## Rules
 
 - **Write from the code, not from older docs.** The public site is a year stale and names retired repos and
-  services (`references/deprecated-repos.md`, `known-drift.md` in `org-router`). Before editing a page, decide
+  services (`known-drift.md` in `org-router`). Before editing a page, decide
   whether it should exist; deleting a wrong deployment guide beats polishing it.
 - **In-repo docs travel with the code**: a change to behaviour updates the doc in the same PR in the same
   repo. Never document a cvhome behaviour in the org repo or the site only.
@@ -32,6 +34,12 @@ description: How to execute a documentation or product-idea task for cvhome-saas
   (`seller-ui` → `console-ui`, `catalog-service` → `store-pod/catalog`).
 - Diagrams: Mermaid in Markdown for the site (`vitepress-plugin-mermaid`); the platform's draw.io source is
   `cvhome-saas.github.io/docs/digrams/aws-arch.drawio` (misspelled dir, keep the path or move it with a redirect).
+
+## assets / fast-run
+
+`fast-run.sh` is what a stranger runs first. It must only name services, hosts and images that exist today
+(`common-config.yml`, `configure-domain.sh`, images published by cvhome's public-ECR workflow). Test it on a
+clean Docker host before pushing; the raw URL is live the moment `main` moves.
 
 ## Public site workflow
 

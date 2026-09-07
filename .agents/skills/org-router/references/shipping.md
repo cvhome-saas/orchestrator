@@ -20,7 +20,7 @@ checkout is dirty on `main` (cvhome often has untracked plans), leave those file
 | Repo | How to start | Why |
 |---|---|---|
 | `cvhome` | `git -C cvhome fetch origin && git -C cvhome worktree add --no-track cvhome/.claude/worktrees/<type>-<name> -b <type>/<name> origin/main`; then every path is `cvhome/.claude/worktrees/<type>-<name>/...` | hook-enforced; the primary checkout stays on clean `main` |
-| `cvhome-platform`, `lcl`, `load-testing`, `saas-gateway`, `caddy-domainlookup`, `aws-otel-collector`, `cvhome-saas.github.io`, `ideation` | `git -C <repo> switch -c <type>/<name> origin/main` (a worktree is fine too: `git -C <repo> worktree add ../.wt/<repo>-<name> -b <type>/<name> origin/main` — keep it outside the checkout) | no worktree rule, but a push to `main` in the image repos publishes an image |
+| `cvhome-platform`, `lcl`, `load-testing`, `e2e-testing`, `saas-gateway`, `caddy-domainlookup`, `certmagic-s3`, `aws-otel-collector`, `public-dkr`, `assets`, `cvhome-saas.github.io`, `dot-github`, `ideation` | `git -C <repo> switch -c <type>/<name> origin/main` (a worktree is fine too: `git -C <repo> worktree add ../.wt/<repo>-<name> -b <type>/<name> origin/main` — keep it outside the checkout) | no worktree rule, but a push to `main` in the image repos publishes an image |
 
 `<type>` ∈ `feat|fix|docs|chore|refactor|test`; `<name>` kebab-case; **use the same `<type>/<name>` in every
 repo one change touches** — `cvhome-platform`'s drift check compares against the app branch of the same name.
@@ -34,10 +34,15 @@ repo one change touches** — `cvhome-platform`'s drift check compares against t
 | `lcl` | `npm ci && npm run check && npm test && npm pack --dry-run` |
 | `load-testing` | `npm test` (lint stack + `make inspect` + archives); `make selftest` against a live stack for client changes |
 | `saas-gateway` | `docker build .` succeeds |
-| `caddy-domainlookup` | `go build ./... && go vet ./...` |
+| `caddy-domainlookup`, `certmagic-s3` | `go build ./... && go vet ./...` (`go test ./...` in certmagic-s3) |
+| `e2e-testing` | `npx playwright test` against a running stack (`lcl start -d` in cvhome) |
+| `public-dkr` | `actionlint` on the workflow; the image:tag exists on its source registry (`docker manifest inspect`) |
+| `assets` | run `fast-run.sh` on a clean Docker host; `docker compose config` on its compose file |
+| `dot-github` | Markdown renders; links resolve |
 | `aws-otel-collector` | `docker build .`; collector config validated with `otelcol validate --config otel-config.yaml` if available |
 | `cvhome-saas.github.io` | `npm ci && npm run docs:build` |
 | `ideation` | none |
+| `shopizer` | never edited |
 
 ## 2b. Cross-repo review before the PR
 

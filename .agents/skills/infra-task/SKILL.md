@@ -1,6 +1,6 @@
 ---
 name: infra-task
-description: How to execute an infrastructure or platform task for cvhome-saas - Terraform and CloudFormation in cvhome-platform (ECS Fargate, Cloud Map, ALB/NLB, Route53/ACM, RDS, CloudFront/S3, IAM, CodeBuild pipeline, flavours, hibernation, autoscaling, services.yaml catalog, cost, "why is dev/prod failing"), plus the three helper image/plugin repos (saas-gateway Caddy image, caddy-domainlookup middleware, aws-otel-collector ADOT config). Use after org-router sends the task to infra, or when the task names AWS, Terraform, a flavour, an env, a pod NLB, the bootstrap, or the collector. Covers the stale CLAUDE.md caveat, the drift check against the app, the deploy pipeline, secret safety and the hand-offs to cvhome.
+description: How to execute an infrastructure or platform task for cvhome-saas - Terraform and CloudFormation in cvhome-platform (ECS Fargate, Cloud Map, ALB/NLB, Route53/ACM, RDS, CloudFront/S3, IAM, CodeBuild pipeline, flavours, hibernation, autoscaling, services.yaml catalog, cost, "why is dev/prod failing"), plus the helper image/plugin/mirror repos (saas-gateway Caddy image, caddy-domainlookup middleware, certmagic-s3 cert storage, aws-otel-collector ADOT config, public-dkr public-ECR mirror). Use after org-router sends the task to infra, or when the task names AWS, Terraform, a flavour, an env, a pod NLB, the bootstrap, the collector, a base image or public ECR. Covers the stale CLAUDE.md caveat, the drift check against the app, the deploy pipeline, secret safety and the hand-offs to cvhome.
 ---
 
 # Infra task → `cvhome-platform/` (+ helper images)
@@ -72,10 +72,14 @@ edits publish to `s3://cvhome-saas/platform/bootstrap.yaml` on merge to `main`.
 |---|---|---|
 | `saas-gateway/` | Caddy version, Go version, plugin list, runtime image | Docker Hub `sha-<short>` is published; mirror to public ECR (outside these repos) and **bump the pin** in `cvhome/store-pod/spg/Dockerfile` and `cvhome/docker-compose-lcl.yml` (a `backend-task`) |
 | `caddy-domainlookup/` | The `domain_lookup` directive, cache, lookup contract with `merchant`'s `RouterController` | Rebuild `saas-gateway` (it builds the plugin from source path), then the pin bump above. Fix the Go 1.21 CI vs `go 1.23` mismatch when you are there |
+| `certmagic-s3/` | Caddy `storage s3 { bucket region prefix endpoint }` — how spg tasks share on-demand certs in the per-pod cert bucket | Same chain: rebuild `saas-gateway`, mirror, bump pins. Keep the Caddyfile's `storage s3` block and the bucket IAM in `modules/store-pod` in step with any new option |
+| `public-dkr/` | An image must exist at `public.ecr.aws/b2i4h4k9/...`: a new `saas-gateway` sha, a node/postgres/otel/paketo base bump | Push to `main` runs the matrix (needs the repo's AWS secrets); then bump the consumer (`cvhome` Dockerfiles / compose / `spg` FROM). The matrix is the only record of what the public registry holds |
 | `aws-otel-collector/` | Which signals/metrics reach X-Ray/EMF/CloudWatch Logs, batch/memory limits | `:latest` moves; force a new deployment of the `otel-collector` ECS service in the env (no Terraform diff). Local dashboards are `cvhome/extra/monitoring`, a separate change |
 
-None of the three has branch protection or a worktree rule, but every push to `main` publishes. Work on a
-branch, open a PR, and say which pin/deployment must follow.
+None of these has branch protection or a worktree rule, but every push to `main` publishes or mirrors.
+Work on a branch, open a PR, and say which pin/deployment must follow. The full chain for a new Caddy build:
+`caddy-domainlookup`/`certmagic-s3` → `saas-gateway` main (Docker Hub `sha-x`) → `public-dkr` matrix entry
+`sha-x` → `cvhome` `store-pod/spg/Dockerfile`, `store-pod/spg/compose.yml`, `docker-compose-lcl.yml` → QA.
 
 ## 6. Hand back to `cvhome` when
 

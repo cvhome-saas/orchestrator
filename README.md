@@ -9,19 +9,25 @@ orchestrator/                this repo: manifest, scripts, agent routing skills
 ├── cvhome-platform/         Terraform + CloudFormation bootstrap
 ├── lcl/                     @cvhome-saas/lcl local stack runner (npm)
 ├── load-testing/            k6 suite
+├── e2e-testing/             Playwright browser regression suite
 ├── saas-gateway/            Caddy image behind the pod edge (spg)
-├── caddy-domainlookup/      Caddy plugin used by saas-gateway
+├── caddy-domainlookup/      Caddy plugin: host → tenant headers
+├── certmagic-s3/            Caddy plugin: certificates in S3
 ├── aws-otel-collector/      ADOT collector image for AWS
+├── public-dkr/              mirror of base images into the org's public ECR
+├── assets/                  fast-run.sh one-command evaluation install
 ├── cvhome-saas.github.io/   public docs site
-└── ideation/                product backlog
+├── dot-github/              org profile (.github repo)
+├── ideation/                product backlog
+└── shopizer/                upstream fork cvhome evolved from (read-only)
 ```
 
 Each subdirectory is its own git repository and is git-ignored here. `repos.yaml` lists every org repo
-with kind, status (`active` / `deprecated` / `reference`) and entry docs.
+with its kind, what it is used for, and the files to open first.
 
 ```bash
-scripts/clone.sh          # clone or fetch every active repo
-scripts/clone.sh --all    # also deprecated/reference repos, for history
+scripts/clone.sh          # clone or fetch every org repo
+scripts/clone.sh cvhome   # just one
 scripts/status.sh         # branch, ahead/behind, dirty count per checkout
 scripts/contract-check.py # do the copies of each cross-repo contract still agree? (nightly in CI too)
 scripts/impact.py <repo>  # what a change in <repo> can break elsewhere, and which checks/questions apply
@@ -41,7 +47,7 @@ guards when editing from this root.
 How the pieces fit:
 
 ```
-caddy-domainlookup + certmagic-s3 ─► saas-gateway image ─► cvhome/store-pod/spg ─┐
+caddy-domainlookup + certmagic-s3 ─► saas-gateway image ─► public-dkr mirror ─► cvhome/store-pod/spg ─┐
 aws-otel-collector image ──────────────────────────────────────────────────────┤
 cvhome (services, common-config.yml, images) ──────────────────────────────────┴─► cvhome-platform (services.yaml, Terraform, CodeBuild)
 cvhome/lcl.yml ─► lcl runs the local stack ─► load-testing measures it

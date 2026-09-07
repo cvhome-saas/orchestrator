@@ -52,8 +52,28 @@ anyway.
 - Workflow sets up buildx/QEMU but `build.sh` does a plain single-arch `docker build`.
 
 ## cvhome-saas.github.io
-- Entire deployment section and the architecture page describe the retired repos and services; see
-  `deprecated-repos.md`. Do not "fix a typo" here without deciding whether the page should exist.
+- Entire deployment section and the architecture page describe an older layout: repos named
+  `cvhome-bootstrap` / `cvhome-ecs-fargate-infra` (infra is `cvhome-platform`), services `store-ui` /
+  `welcome-ui` / `merchant-ui` (now `console-ui`, `billing`, `pod-registry`, ...), ALB TLS termination (now
+  NLB passthrough to Caddy). Do not "fix a typo" here without deciding whether the page should exist.
+
+## public-dkr
+- The matrix mirrors `saas-gateway:sha-8eed986` — the same sha `cvhome/store-pod/spg/Dockerfile` pins, so AWS
+  is consistent, but `docker-compose-lcl.yml` runs `sha-4a6d381` straight from Docker Hub. Mirrors
+  `otel/opentelemetry-collector-contrib:0.139.0` while `docker-compose-lcl.yml` runs `0.150.1`.
+- README lists two images; the workflow matrix has nine. The matrix is the truth.
+
+## assets
+- `fast-run/fast-run.sh` and its compose file describe the 1.0.x layout (`core-auth`, `store-ui`, `welcome-ui`,
+  `merchant-ui`, `order`, RabbitMQ, registry `public.ecr.aws/g0a5h6c1/1691275173`). None of that exists in
+  the current catalog; the docs site still links it as the quick start.
+
+## e2e-testing
+- Playwright scaffold only: `tests/example.spec.ts` hits playwright.dev, no `baseURL`, no cvhome journey. The
+  CI workflow runs on every push and passes vacuously.
+
+## certmagic-s3
+- `go.mod` pins caddy 2.7.6 like `caddy-domainlookup`; both are compiled by `saas-gateway` on Go 1.25.
 
 ## ideation
 - Feature docs reference `seller-ui`, `catalog-service`, `analytics-service`, `search-service`; map to

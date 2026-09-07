@@ -1,43 +1,37 @@
 #!/usr/bin/env bash
-# Clone (or fetch) repos from repos.yaml into this directory.
-#   scripts/clone.sh                 # every active repo
-#   scripts/clone.sh --all           # also deprecated/reference repos, for reading history
-#   scripts/clone.sh cvhome lcl      # just these (any status)
-# Prints one line per repo: cloned | fetched, plus ahead/behind against origin/<default>.
+# Clone (or fetch) the org's repos from repos.yaml into this directory.
+#   scripts/clone.sh                 # every repo in the manifest
+#   scripts/clone.sh cvhome lcl      # just these
+# Prints one line per repo: cloned | fetched, plus behind/ahead against origin/<branch>.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 - "$@" <<'PY'
 import re, subprocess, sys, pathlib
-args = sys.argv[1:]
-want_all = "--all" in args
-names = [a for a in args if not a.startswith("--")]
+names = sys.argv[1:]
 text = pathlib.Path("repos.yaml").read_text()
 blocks = re.split(r"\n  - name: ", text)[1:]
 known = {}
 for b in blocks:
     name = b.split("\n", 1)[0].strip()
-    known[name] = (re.search(r"status: (\w+)", b).group(1), re.search(r"url: (\S+)", b).group(1))
+    d = re.search(r"\n    dir: (\S+)", b)
+    known[name] = (re.search(r"url: (\S+)", b).group(1), d.group(1) if d else name)
 unknown = [n for n in names if n not in known]
 if unknown:
     sys.exit(f"not in repos.yaml: {', '.join(unknown)}")
-for name, (status, url) in known.items():
-    if name == "orchestrator":
+for name, (url, d) in known.items():
+    if name == "orchestrator" or (names and name not in names):
         continue
-    if names and name not in names:
-        continue
-    if not names and status != "active" and not want_all:
-        continue
-    p = pathlib.Path(name)
-    if p.is_dir() and (p / ".git").exists():
-        subprocess.run(["git", "-C", name, "fetch", "--prune", "--quiet"], check=False)
+    p = pathlib.Path(d)
+    if (p / ".git").exists():
+        subprocess.run(["git", "-C", d, "fetch", "--prune", "--quiet"], check=False)
         try:
-            branch = subprocess.check_output(["git", "-C", name, "branch", "--show-current"], text=True).strip()
-            ab = subprocess.check_output(["git", "-C", name, "rev-list", "--left-right", "--count", f"origin/{branch}...{branch}"], text=True).split()
+            branch = subprocess.check_output(["git", "-C", d, "branch", "--show-current"], text=True).strip()
+            ab = subprocess.check_output(["git", "-C", d, "rev-list", "--left-right", "--count", f"origin/{branch}...{branch}"], text=True).split()
             state = f"fetched  branch={branch} behind={ab[0]} ahead={ab[1]}"
         except subprocess.CalledProcessError:
             state = "fetched  (no upstream)"
     else:
-        r = subprocess.run(["git", "clone", "--quiet", url, name], check=False)
+        r = subprocess.run(["git", "clone", "--quiet", url, d], check=False)
         state = "cloned" if r.returncode == 0 else f"clone FAILED ({url})"
-    print(f"{name:24} {status:10} {state}")
+    print(f"{name:24} -> {d:24} {state}")
 PY
