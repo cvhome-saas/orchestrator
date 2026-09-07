@@ -1,6 +1,9 @@
-# cvhome-saas — org checkout
+# cvhome-saas orchestrator
 
-This directory is the **organisation root** for https://github.com/cvhome-saas, not a project. Each
+This directory is the **organisation root** for https://github.com/cvhome-saas (repo
+`cvhome-saas/orchestrator`), not a project. Sessions start here and stay here: the agent never needs to
+be re-launched inside a sub-repo. It routes each task to the right checkout and works there by absolute
+path (`cd <repo> && …` inside one Bash call, `git -C <repo> …`). Each
 subdirectory is an independent git repository with its own rules. This repo tracks only `repos.yaml`,
 `scripts/`, the routing skills under `.agents/skills/` (linked from `.claude/skills/`) and this file.
 
@@ -27,6 +30,9 @@ Rules that hold everywhere:
 - **One repo per commit.** A change that spans repos is an ordered series of PRs (`cross-repo-change`).
 - **Read the target repo's `AGENTS.md`/`CLAUDE.md` before editing it.** `cvhome`, `lcl` and `load-testing`
   keep their rules in `AGENTS.md`; auto-loading from this root is not guaranteed.
+- **Sub-repo skills are reachable from here.** Claude Code lists them directory-scoped
+  (`cvhome/.claude/skills/project-structure`, `load-testing/.claude/skills/k6`,
+  `cvhome-platform/.claude/skills/terraform-*`); invoke them with the Skill tool when working under that path.
 - **`cvhome` edits go in a worktree**, never its primary checkout. `.claude/hooks/subrepo-guard.mjs` here
   re-applies cvhome's own worktree and push guards when you work from this root.
 - **Nothing is deployed from `cvhome`'s CI**; images build in CodeBuild and Terraform applies. Do not add

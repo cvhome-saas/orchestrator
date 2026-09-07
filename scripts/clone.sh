@@ -14,6 +14,8 @@ for b in blocks:
     name = b.split("\n", 1)[0].strip()
     status = re.search(r"status: (\w+)", b).group(1)
     url = re.search(r"url: (\S+)", b).group(1)
+    if name == "orchestrator":
+        continue
     if status != "active" and not want_all:
         continue
     p = pathlib.Path(name)

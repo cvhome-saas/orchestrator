@@ -6,6 +6,13 @@
 # status: active | deprecated | reference
 org: cvhome-saas
 repos:
+  - name: orchestrator
+    kind: docs
+    status: active
+    url: https://github.com/cvhome-saas/orchestrator.git
+    summary: This repo. The org root that agents start in - repo manifest, clone/status scripts, and the routing skills (org-router, backend-task, infra-task, tools-task, docs-task, cross-repo-change).
+    entry: [CLAUDE.md, repos.yaml, .agents/skills/org-router/SKILL.md]
+
   - name: cvhome
     kind: app
     status: active

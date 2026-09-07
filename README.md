@@ -1,10 +1,10 @@
-# cvhome-saas
+# cvhome-saas orchestrator
 
 Organisation checkout for [github.com/cvhome-saas](https://github.com/cvhome-saas): a multi-tenant
 e-commerce SaaS (Java / Spring Boot, Angular, Next.js) on AWS ECS Fargate, plus the tools around it.
 
 ```
-cvhome-saas/                 this repo: manifest, scripts, agent routing skills
+orchestrator/                this repo: manifest, scripts, agent routing skills
 ├── cvhome/                  application monorepo
 ├── cvhome-platform/         Terraform + CloudFormation bootstrap
 ├── lcl/                     @cvhome-saas/lcl local stack runner (npm)
@@ -26,6 +26,8 @@ scripts/status.sh         # branch, ahead/behind, dirty count per checkout
 ```
 
 ## Working with AI agents here
+
+Start Claude Code in this directory and describe the task; you do not navigate into a sub-repo yourself.
 
 `CLAUDE.md` and `.agents/skills/` make this directory usable as a Claude Code project root. The
 `org-router` skill sends a task to the right repo and to that repo's own conventions; the per-area skills
