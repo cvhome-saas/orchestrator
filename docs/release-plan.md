@@ -55,8 +55,8 @@ run with `bump=patch`.
 
 | # | Repo | Change | State |
 |---|---|---|---|
-| 1 | `cvhome` | version from the tag; `createImageTags` → `X.Y.Z`, `X.Y`, `latest`; old release and publish workflows and `suggested-version.sh` deleted; no publish workflow | [cvhome#334](https://github.com/cvhome-saas/cvhome/pull/334) open |
-| 2 | `cvhome-platform` | `image_tag` in every `envs/*.tfvars`, no `latest` fallback, guard on protected flavours; bootstrap `ImageTag` parameter, CodeBuild builds the app at `v<ImageTag>` with `-Pversion`; CI compares against cvhome at the same tag | [cvhome-platform#2](https://github.com/cvhome-saas/cvhome-platform/pull/2) open |
+| 1 | `cvhome` | version from the tag; `createImageTags` → `X.Y.Z`, `X.Y`, `latest`; old release and publish workflows and `suggested-version.sh` deleted; no publish workflow | [cvhome#334](https://github.com/cvhome-saas/cvhome/pull/334) merged |
+| 2 | `cvhome-platform` | `image_tag` in every `envs/*.tfvars`, no `latest` fallback, guard on protected flavours; bootstrap `ImageTag` parameter, CodeBuild builds the app at `v<ImageTag>` with `-Pversion`; CI compares against cvhome at the same tag | [cvhome-platform#2](https://github.com/cvhome-saas/cvhome-platform/pull/2) merged |
 | 3 | `orchestrator` | `release-product.yml`, `promote.yml`, `scripts/release.py`, `releases/`, `docs/releasing.md`, `contract-check release`; GitHub App secrets | on `main`; App secrets pending |
 | 4 | all tagged repos | first release `2.0.0`; promote dev → staging → prod | after 1–3 merge |
 | 5 | `saas-gateway`, `aws-otel-collector` | `type=semver` tags in the existing docker-publish workflow so a `vX.Y.Z` tag also pushes `X.Y.Z` | small PRs |
