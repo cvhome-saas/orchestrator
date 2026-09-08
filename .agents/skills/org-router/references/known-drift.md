@@ -38,6 +38,10 @@ anyway.
   0.1.0. A release needs the bump in both `package.json` and `src/version.ts`.
 
 ## load-testing
+- `scripts/cleanup.sql` (the SQL pass of `make clean`) is stale against the current cvhome schema: it deletes from
+  `tenancy.organization` (gone since the tenancy / pod-registry split) and hits the `merchant_language` foreign key
+  when deleting `merchant_store`. The API pass works; the SQL pass errors. Until fixed, a full wipe is
+  `make stack-down-hard` (drops the stack's volumes). Found 2026-09-08.
 - Since 2026-09-08 the load stack and all monitoring configuration live here (`stack/`, `docs/monitoring/`); until
   the cvhome PR that removes `extra/monitoring` merges, both repos carry a copy and load-testing's is the one to edit.
 - `results/` has 14 local JSON summaries, gitignored; `docs/baseline.md` is the committed record.
