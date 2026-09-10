@@ -1,6 +1,6 @@
 ---
 name: fullstack-task
-description: How to execute a full-stack application task in the cvhome monorepo - Java 25 / Spring Boot services, Angular 20 console-ui and uaa-fe, Next.js 16 landing-ui and its themes, uaa/cua auth, tenancy, catalog, checkout, payment, DDL, .http files, tests, Gradle/npm build, common-config / lcl-config / fargate-config slices, lcl.yml, docker-compose files, extra/monitoring, the spg Caddyfile, cvhome CI. Use after org-router sends the task to cvhome/, or whenever the task names a cvhome service, module, endpoint, screen, page, component, theme or config slice. Enforces the worktree-per-change rule, the plan-as-phases rule, the design gate (a new screen starts in the design portal and needs an approved record before any Angular/Next.js page file), the QA file rule, the per-repo skills to load, the verification gates and the hand-offs back to infra/tools/docs.
+description: How to execute a full-stack application task in the cvhome monorepo - Java 25 / Spring Boot services, Angular 20 console-ui and uaa-fe, Next.js 16 landing-ui and its themes, uaa/cua auth, tenancy, catalog, checkout, payment, DDL, .http files, tests, Gradle/npm build, common-config / lcl-config / fargate-config slices, lcl.yml, docker-compose files, extra/monitoring, the spg Caddyfile, cvhome CI. Use after org-router sends the task to cvhome/, or whenever the task names a cvhome service, module, endpoint, screen, page, component, theme or config slice. Enforces the worktree-per-change rule, the plan-is-one-PR rule (one commit per phase), the design gate (a new screen starts in the design portal and needs an approved record before any Angular/Next.js page file), the QA file rule, the per-repo skills to load, the verification gates and the hand-offs back to infra/tools/docs.
 ---
 
 # Full-stack application task → `cvhome/` (Java + Angular + Next.js)
@@ -23,14 +23,16 @@ primary checkout stays on a clean `main`. This is enforced by `cvhome/.claude/ho
 and the org-level hook re-applies it when you edit from the org root. Plans are the exception: write
 `.agents/plans/<kebab-name>.md` in the primary checkout first, then cut the worktree.
 
-## 1b. Plan = phases, phase = PR
+## 1b. Plan = one PR, phase = one commit
 
-Anything bigger than one PR starts as `cvhome/.agents/plans/<kebab-name>.md` (written in the primary
+Anything bigger than one commit starts as `cvhome/.agents/plans/<kebab-name>.md` (written in the primary
 checkout before the worktree exists; the guard allows it): context with file:line evidence, why the design
-is what it is, then `## Phase N — <area> (PR N)` sections, an *Other repos* section the orchestrator picks
-up, deviations as built, verification. Each phase is committed and shipped as its own PR from the same
-worktree before the next starts (stack them if a later phase needs an earlier one). Reference plans:
-`.agents/plans/user-impersonation.md` (four phases, four PRs), `checkout-rewrite.md` (§ 11 Phasing).
+is what it is, then `## Phase N — <area>` sections, an *Other repos* section the orchestrator picks
+up, deviations as built, verification. **The plan is one PR.** Each phase is a commit on the same branch,
+easiest first, so a reviewer reads the sequence and any one phase can be reverted alone — never a PR per
+phase, which re-conflicts every remaining branch on each merge and makes each one re-earn its verify
+receipt. Reference plans: `.agents/plans/user-impersonation.md` (four phases), `checkout-rewrite.md`
+(§ 11 Phasing).
 
 ## 1c. Design gate — a new screen starts in the design portal
 

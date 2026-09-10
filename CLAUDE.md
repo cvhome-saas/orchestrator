@@ -41,7 +41,7 @@ Rules that hold everywhere:
   (`cvhome/.claude/skills/project-structure`, `load-testing/.claude/skills/k6`,
   `cvhome-platform/.claude/skills/terraform-*`); invoke them with the Skill tool when working under that path.
 - **Every repo works the same way** (`repo-standard`, learned from cvhome): `CLAUDE.md` imports `AGENTS.md`;
-  a fresh worktree per change cut from `origin/main`; a plan is phases and a phase is one PR; `scripts/verify.sh`
+  a fresh worktree per change cut from `origin/main`; a plan is one PR with one commit per phase; `scripts/verify.sh`
   writes the receipt the push hooks demand; `/go` ships; a QA file per area with `[verified]` tags; a new screen
   starts in the design portal (`design` skill) and needs an approved `.agents/designs/<slug>.md` before any page
   file. `.claude/hooks/subrepo-guard.mjs` here re-applies each repo's worktree, design and push guards when you
