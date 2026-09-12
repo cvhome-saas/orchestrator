@@ -21,6 +21,8 @@ copy, in separate PRs per repo, producers before consumers. CI catches only the 
 | `lcl.yml` schema (keys, `version: 1`) | `lcl/schema/lcl.schema.json` | `cvhome/lcl.yml`, the `lcl-stack-builder` skill copies in `lcl/` and `cvhome/`, `lcl/templates`, `lcl/examples` | `lcl validate`; `lcl/test/examples.test.ts` |
 | Public architecture story | `cvhome/.claude/skills/project-structure/`, `cvhome-platform/docs/infra-target-architecture.html` | `cvhome-saas.github.io/docs/**`, `cvhome/README.md` | no — the docs site is a year stale |
 | Rate limits, paging, sort conventions, trial caps | `cvhome` service code | `load-testing/AGENTS.md` "facts that shaped the suite" | no |
+| Local infra images (`postgres`, `minio`) and the registry they come from | `cvhome/docker-compose-lcl.yml` | `cvhome/store-commons/test-support/.../containers/{Postgres,Minio}TestConfiguration.java` `IMAGE` (CI's Testcontainers), `load-testing/stack/docker-compose.yml`; `assets/fast-run/docker-compose.yml` is 1.0.x drift | `contract-check.py infra-images` — the pins agree, and none is on a registry that stopped serving it (`DEAD_IMAGES`: Docker Hub `minio/minio` since 2026-09, `bitnami/*` since 2025-09). A cached image hides a dead registry locally; the first clean pull (CI, a new laptop) finds it |
+| The sku format (`^[A-Za-z0-9_-]{1,255}$`, case kept, never trimmed) | `cvhome/store-commons/commons/.../domain/Sku.java` `Sku.FORMAT`, enforced at every catalog, inventory and checkout edge | `cvhome/store-core/console-ui` `SKU_PATTERN` (product form, variants step), `load-testing/k6/data/*.json` seed skus, `load-testing/k6/lib/fixtures` + `journeys/admin` generators (`K6-SKU-…`, `K6-EDIT-…`) | `contract-check.py sku-format` (console-ui patterns and seed skus; the generators are proved by `make selftest`) |
 
 ## Recipes
 
@@ -46,6 +48,12 @@ public ECR) → bump the pins in `cvhome` (`store-pod/spg/Dockerfile`, `store-po
 
 **Bump a base image** (node, postgres, otel-contrib, paketo): `public-dkr` matrix first, then the `FROM` /
 compose line in `cvhome`, then `e2e-testing`/`load-testing` if they pin the same tag.
+
+**Move a local infra image** (postgres, minio; a new tag or a registry that stopped serving it): `cvhome`
+`docker-compose-lcl.yml` and the matching Testcontainers `*TestConfiguration.IMAGE` in one commit (a non-Docker
+Hub name for a Testcontainers module needs `asCompatibleSubstituteFor`), then `load-testing/stack/docker-compose.yml`.
+Prove the pull on a clean registry fetch, not a cached image; `contract-check.py infra-images` confirms the three
+agree. The 2026-09-12 MinIO move (cvhome#351, load-testing#10) is the worked example.
 
 **Change what telemetry reaches CloudWatch**: `aws-otel-collector/otel-config.yaml` → push main (`:latest`
 moves) → force a new ECS deployment of `otel-collector` in `cvhome-platform` (no Terraform diff on `:latest`;
