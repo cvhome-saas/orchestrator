@@ -3,7 +3,8 @@
 Cross-repo contract check for the cvhome-saas organisation.
 
 One fact, several copies: the service catalog, ports, edge routes, env/secret names, image pins,
-SLO buckets and local hostnames each live in one repo and are copied into others. This script reads
+the local infra images, SLO buckets, local hostnames and the sku format each live in one repo and are
+copied into others. This script reads
 every copy and reports where they disagree. It is what the orchestrator runs as a reviewer before
 and after any change in any repo, and what a PR in one repo cannot see about the others.
 
@@ -13,7 +14,7 @@ and after any change in any repo, and what a PR in one repo cannot see about the
     scripts/contract-check.py --cvhome /path/to/cvhome/.claude/worktrees/feat-x   # review a branch/PR worktree
     scripts/contract-check.py --cvhome-platform /path/to/platform-worktree
 
-Any repo path can be overridden (--cvhome, --cvhome-platform, --load-testing, --lcl, --saas-gateway, --public-dkr) so the
+Any repo path can be overridden (--cvhome, --cvhome-platform, --load-testing, --lcl, --saas-gateway, --public-dkr, --assets) so the
 reviewer can evaluate a proposed change (a worktree, a `gh pr checkout`) against the other repos' main.
 
 Exit 0 = no failures (warnings allowed), 1 = at least one FAIL, 2 = a required checkout is missing.
@@ -32,18 +33,28 @@ import sys
 from pathlib import Path
 
 ORG = Path(__file__).resolve().parent.parent
-APP = PLATFORM = LOAD = LCL = GATEWAY_IMG = MIRROR = Path()
+APP = PLATFORM = LOAD = LCL = GATEWAY_IMG = MIRROR = ASSETS = Path()
 COMMON_CONFIG = FARGATE_CONFIG = LCL_YML = CADDYFILE = SPG_DOCKERFILE = COMPOSE_LCL = GATEWAY_ROUTES = Path()
 SERVICES_YAML = BOOTSTRAP = DRIFT_SCRIPT = LCL_JSON = THRESHOLDS = K6_CLIENTS = K6_LIB = Path()
+TEST_CONTAINERS = SKU_JAVA = CONSOLE_SRC = LOAD_COMPOSE = K6_DATA = FAST_RUN_COMPOSE = Path()
+
+# Images a registry no longer serves. A pin to one of these fails the first pull on a clean host or CI runner
+# (a cached copy hides it locally). Prefix -> what happened and what to use instead.
+DEAD_IMAGES = {
+    "minio/minio:": "Docker Hub stopped serving minio/minio (2026-09); the same release is quay.io/minio/minio",
+    "bitnami/": "Bitnami removed its Docker Hub catalog (2025-09); bitnamilegacy/ is a frozen copy",
+}
 
 
 def bind_paths(overrides: dict[str, str]) -> None:
     """Resolve every file the checks read, honouring --<repo> path overrides."""
-    global APP, PLATFORM, LOAD, LCL, GATEWAY_IMG, MIRROR
+    global APP, PLATFORM, LOAD, LCL, GATEWAY_IMG, MIRROR, ASSETS
     global COMMON_CONFIG, FARGATE_CONFIG, LCL_YML, CADDYFILE, SPG_DOCKERFILE, COMPOSE_LCL, GATEWAY_ROUTES
     global SERVICES_YAML, BOOTSTRAP, DRIFT_SCRIPT, LCL_JSON, THRESHOLDS, K6_CLIENTS, K6_LIB
+    global TEST_CONTAINERS, SKU_JAVA, CONSOLE_SRC, LOAD_COMPOSE, K6_DATA, FAST_RUN_COMPOSE
     pick = lambda name: Path(overrides.get(name) or overrides.get(name.replace("-", "_")) or ORG / name).resolve()
-    APP, PLATFORM, LOAD, LCL, GATEWAY_IMG, MIRROR = (pick(n) for n in ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway", "public-dkr"))
+    APP, PLATFORM, LOAD, LCL, GATEWAY_IMG, MIRROR, ASSETS = (
+        pick(n) for n in ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway", "public-dkr", "assets"))
     COMMON_CONFIG = APP / "store-commons/autoconfigure/src/main/resources/common-config.yml"
     FARGATE_CONFIG = APP / "store-commons/autoconfigure/src/main/resources/fargate-config.yml"
     LCL_YML = APP / "lcl.yml"
@@ -58,6 +69,12 @@ def bind_paths(overrides: dict[str, str]) -> None:
     THRESHOLDS = LOAD / "k6/config/thresholds.js"
     K6_CLIENTS = LOAD / "k6/lib/clients"
     K6_LIB = LOAD / "k6/lib"
+    TEST_CONTAINERS = APP / "store-commons/test-support/src/main/java/com/asrevo/cvhome/testsupport/containers"
+    SKU_JAVA = APP / "store-commons/commons/src/main/java/com/asrevo/cvhome/commons/domain/Sku.java"
+    CONSOLE_SRC = APP / "store-core/console-ui/src"
+    LOAD_COMPOSE = LOAD / "stack/docker-compose.yml"
+    K6_DATA = LOAD / "k6/data"
+    FAST_RUN_COMPOSE = ASSETS / "fast-run/docker-compose.yml"
 
 results: list[dict] = []
 
@@ -437,6 +454,52 @@ def check_public_ecr() -> None:
         report(c, "FAIL", f"spg Dockerfile pins saas-gateway:{d.group(1)} but public-dkr mirrors {gw}")
 
 
+def compose_image(path: Path, service: str) -> str | None:
+    """The `image:` of one top-level compose service; `${VAR:-default}` reads as its default."""
+    m = re.search(rf"^  {re.escape(service)}:\n(?:(?:    .*|\s*)\n)*?    image:\s*(\S+)", path.read_text(), re.M)
+    if not m:
+        return None
+    default = re.fullmatch(r"\$\{\w+:-(.+)\}", m.group(1))
+    return default.group(1) if default else m.group(1)
+
+
+def check_infra_images() -> None:
+    """postgres and MinIO: cvhome's compose, its Testcontainers and load-testing's stack pin one image, on a live registry."""
+    c = "infra-images"
+    if not need(COMPOSE_LCL, c):
+        return
+    pins: dict[str, dict[str, str | None]] = {}
+    for svc, tc_class in (("postgres", "PostgresTestConfiguration"), ("minio", "MinioTestConfiguration")):
+        where = pins.setdefault(svc, {})
+        where["cvhome docker-compose-lcl.yml"] = compose_image(COMPOSE_LCL, svc)
+        tc = TEST_CONTAINERS / f"{tc_class}.java"
+        if tc.exists():
+            m = re.search(r'\bIMAGE\s*=\s*"([^"]+)"', tc.read_text())
+            where[f"cvhome {tc_class}"] = m.group(1) if m else None
+        if LOAD_COMPOSE.exists():
+            where["load-testing stack/docker-compose.yml"] = compose_image(LOAD_COMPOSE, svc)
+    ok = True
+    for svc, where in pins.items():
+        found = {label: image for label, image in where.items() if image}
+        for label, image in found.items():
+            dead = next((why for prefix, why in DEAD_IMAGES.items() if image.startswith(prefix)), None)
+            if dead:
+                ok = False
+                report(c, "FAIL", f"{label} pins {image}: {dead}", "move every copy to the live registry in one sweep (cvhome + load-testing)")
+        if len(set(found.values())) > 1:
+            ok = False
+            report(c, "WARN", f"{svc} is pinned differently: " + "; ".join(f"{label} {image}" for label, image in found.items()),
+                   "local dev, CI and the load stack should run the same image")
+    if FAST_RUN_COMPOSE.exists():
+        image = compose_image(FAST_RUN_COMPOSE, "minio")
+        dead = next((why for prefix, why in DEAD_IMAGES.items() if image and image.startswith(prefix)), None)
+        if dead:
+            report(c, "WARN", f"assets fast-run pins {image}: {dead} (fast-run is 1.0.x drift anyway, known-drift.md)")
+    if ok:
+        report(c, "OK", "postgres and MinIO are pinned alike in cvhome compose, Testcontainers and the load stack: "
+                        + ", ".join(sorted({i for w in pins.values() for i in w.values() if i})))
+
+
 def check_slo() -> None:
     """k6 p95 thresholds must be bucket boundaries of the app's http.server.requests SLO histogram."""
     c = "slo"
@@ -489,6 +552,85 @@ def check_load_env() -> None:
         report(c, "WARN", f"services with no k6 client or request name: {uncovered} (see load-testing/docs/coverage.md)")
     if not problems and not uncovered:
         report(c, "OK", "lcl.json matches common-config.yml and every service has k6 coverage")
+
+
+def char_class(pattern: str) -> set[str] | None:
+    """What an anchored one-class pattern (`^[A-Za-z0-9_-]{1,255}$`, `^[A-Za-z0-9._-]+$`) accepts, as a set."""
+    m = re.fullmatch(r"\^\[([^\]^][^\]]*)\](?:\+|\*|\{\d*,?\d*\})\$", pattern)
+    if not m:
+        return None
+    body, chars, i = m.group(1), set(), 0
+    while i < len(body):
+        if body[i] == "\\" and i + 1 < len(body):
+            chars.add(body[i + 1])
+            i += 2
+        elif i + 2 < len(body) and body[i + 1] == "-":
+            chars.update(chr(x) for x in range(ord(body[i]), ord(body[i + 2]) + 1))
+            i += 3
+        else:
+            chars.add(body[i])
+            i += 1
+    return chars
+
+
+def sku_values(node) -> list[str]:
+    """Every string under a `sku` / `skus` key, at any depth of a JSON document."""
+    out: list[str] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key in ("sku", "skus"):
+                out += [v for v in (value if isinstance(value, list) else [value]) if isinstance(v, str)]
+            else:
+                out += sku_values(value)
+    elif isinstance(node, list):
+        for value in node:
+            out += sku_values(value)
+    return out
+
+
+def check_sku_format() -> None:
+    """The sku rule is Sku.FORMAT; console-ui's client-side sku patterns and load-testing's seed skus must agree."""
+    c = "sku-format"
+    if not SKU_JAVA.exists():
+        report(c, "SKIP", f"no Sku value object on this cvhome ref ({SKU_JAVA.relative_to(APP)})")
+        return
+    m = re.search(r'\bFORMAT\s*=\s*"([^"]+)"', SKU_JAVA.read_text())
+    fmt = m.group(1) if m else ""
+    server = char_class(fmt)
+    if not server:
+        report(c, "FAIL", "cannot read Sku.FORMAT as one anchored character class; teach char_class() the new shape")
+        return
+    rule = re.compile(fmt)
+    problems = []
+    patterns = 0
+    for ts in sorted(CONSOLE_SRC.rglob("*.ts")) if CONSOLE_SRC.exists() else []:
+        if ts.name.endswith(".spec.ts"):
+            continue
+        for n, line in enumerate(ts.read_text().splitlines(), 1):
+            if "sku" not in line.lower():
+                continue
+            for literal in re.findall(r"/(\^\[[^\]]+\][+*]\$)/", line):
+                client = char_class(literal)
+                if client is None:
+                    continue
+                patterns += 1
+                where = f"{ts.relative_to(APP)}:{n}"
+                if client - server:
+                    problems.append(f"{where} accepts {''.join(sorted(client - server))!r}, which the server refuses (the save 400s)")
+                if server - client:
+                    problems.append(f"{where} refuses {''.join(sorted(server - client))!r}, which the server accepts")
+    seeds = 0
+    for data in sorted(K6_DATA.glob("*.json")) if K6_DATA.exists() else []:
+        values = sku_values(json.loads(data.read_text()))
+        seeds += len(values)
+        bad = [v for v in values if not rule.fullmatch(v)]
+        if bad:
+            problems.append(f"load-testing {data.relative_to(LOAD)} holds skus the server refuses: {bad[:5]}")
+    if problems:
+        report(c, "WARN", f"the sku rule (Sku.FORMAT {fmt}) has disagreeing copies: " + "; ".join(problems),
+               "make each copy Sku.FORMAT's; the server is the owner")
+    else:
+        report(c, "OK", f"Sku.FORMAT {fmt}: {patterns} console-ui sku pattern(s) and {seeds} k6 seed skus agree")
 
 
 def check_lcl_validate() -> None:
@@ -579,8 +721,10 @@ CHECKS = {
     "env": check_env,
     "spg-image": check_spg_pin,
     "public-ecr": check_public_ecr,
+    "infra-images": check_infra_images,
     "slo": check_slo,
     "load-testing": check_load_env,
+    "sku-format": check_sku_format,
     "lcl-schema": check_lcl_validate,
     "skill-map": check_skill_table,
     "release": check_release,
@@ -592,7 +736,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--only", help="comma-separated subset of: " + ",".join(CHECKS))
-    repos = ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway", "public-dkr")
+    repos = ("cvhome", "cvhome-platform", "load-testing", "lcl", "saas-gateway", "public-dkr", "assets")
     for repo in repos:
         ap.add_argument(f"--{repo}", dest=repo.replace("-", "_"), help=f"path to use instead of ./{repo} (a worktree or PR checkout)")
     args = ap.parse_args()

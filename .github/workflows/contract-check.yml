@@ -2,7 +2,8 @@ name: cross-repo contract check
 
 # The review nobody's per-repo CI can do: clone every active repo at main and check that the
 # copies of each contract (service catalog, ports, edge routes, env/secret names, image pins,
-# SLO buckets, local hostnames, lcl.yml schema) still agree. Runs nightly and on demand.
+# local infra images, SLO buckets, local hostnames, the sku format, lcl.yml schema) still agree.
+# Runs nightly and on demand.
 # A FAIL here means something merged in one repo will not work with another in production.
 
 on:
