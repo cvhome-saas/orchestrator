@@ -32,9 +32,6 @@ anyway.
   `sha-4a6d381` (Docker Hub). `saas-gateway` HEAD is `4a6d381`. Local and AWS run different Caddy builds.
 - Untracked plans on `main` (`.agents/plans/*.md`, `.claude/plans/*.md`) as of today; they are allow-listed by
   the worktree guard, but decide whether to commit them.
-- `docker-compose-lcl.yml` and Testcontainers' `MinioTestConfiguration` pull `minio/minio` from Docker Hub, which
-  stopped serving it (401): every storage integration test fails on a clean CI runner. Fixed by cvhome#351
-  (`quay.io/minio/minio`, same release and digest); `contract-check.py infra-images` FAILs until it merges.
 
 ## lcl
 - `CHANGELOG.md` has an *Unreleased* section (project `.env` defaults) above 0.1.0; `package.json` is still
@@ -48,8 +45,6 @@ anyway.
 - Since 2026-09-08 the load stack and all monitoring configuration live here (`stack/`, `docs/monitoring/`); until
   the cvhome PR that removes `extra/monitoring` merges, both repos carry a copy and load-testing's is the one to edit.
 - `results/` has 14 local JSON summaries, gitignored; `docs/baseline.md` is the committed record.
-- `stack/docker-compose.yml` pulls `minio/minio` from Docker Hub, which stopped serving it: `make stack-up` fails
-  on a host without it cached. Fixed by load-testing#10 (`quay.io/minio/minio`, the pin cvhome uses).
 
 ## saas-gateway
 - `README.md` documents `github.com/techknowlogick/certmagic-s3`; `Dockerfile` builds the org fork
