@@ -22,7 +22,7 @@ guidance. **Every real change lands in exactly one sub-repo per commit**, under 
 | QA that crosses repos and QA at a release; keeping `[verified]` honest | `references/qa.md` | |
 | The design gate: a new screen starts in the design portal | `fullstack-task` § Design gate, `design-guard.mjs` | |
 | Standing audit of drift between repos and against the standard | nightly `contract-check.yml` | `references/known-drift.md` |
-| Decisions and their why, across repos | `docs/*.md` here, plans in the owning repo | |
+| Decisions and their why, across repos | `docs/*.md` here; a change that spans repos has one plan, in `.agents/plans/` here (findings, order, contracts, every repo's phases, release, clean-up) and no copy in any repo; each repo's PR carries its phases as commits | `.agents/plans/org-isolation.md` |
 
 Reference files (read on demand, not all at once):
 

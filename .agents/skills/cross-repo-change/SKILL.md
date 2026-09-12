@@ -19,8 +19,9 @@ Sub-repos are independent git repositories. There is no atomic multi-repo commit
    cd /Volumes/Disk/IdeaProjects/cvhome-saas
    grep -rn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=build --exclude-dir=dist '<fact>' cvhome cvhome-platform lcl load-testing saas-gateway caddy-domainlookup aws-otel-collector cvhome-saas.github.io ideation
    ```
-3. **Write the sequence** before editing, as a checklist in your reply and (for a feature) in
-   `cvhome/.agents/plans/<name>.md` § "Other repos":
+3. **Write the sequence** before editing, as a checklist in your reply and (for a feature) in the
+   orchestrator's `.agents/plans/<name>.md`, the one plan for every repo (worked example: `org-isolation.md`); no
+   repo keeps a copy, and each repo's PR carries its phases as commits:
    ```
    1. cvhome        feat/<name>      files … gates: checkstyle, build, test, integrationTest, lcl QA, verify-before-push
    2. cvhome-platform feat/<name>    services.yaml … gates: fmt, validate, tflint, check-catalog-drift.py (APP_REF=feat/<name> until 1 merges)
