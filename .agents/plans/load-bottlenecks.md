@@ -201,6 +201,20 @@ ms at 5×; recovery p95 32.7 s → 121 ms; orders in the mix 13 → 50). What wa
 - **R5 — throttling stalls**: 66–101 ms before the first query in 5 of 12 sampled requests on the 0.1125- and
   0.225-core caps (`detailed-products` 7 → 77 ms). Nothing to fix; to watch on Fargate.
 
+**The third pass** (2026-09-14 evening, every image rebuilt from e1ef55ce0, phases 1–20, a fresh database, catalog
+at 8; load-testing `docs/baseline.md` → *Heavy spikes, third pass*): the cart deadlock is gone (0 failed cart
+creations in the warm-up, 76 of 91 before); catalog's hit ratios in the mix 82/42/32 → 92/56/55 % and the listing
+and search at 61/57 %; the like-for-like spikes' failure rate halved (12.9 → 6.4 %, 11.6 → 6.2 %) and the mix fell
+back to 7.6 % storefront failures at 1.5× the before pass's throughput, 65 orders, recovery p95 17 ms; no browser
+visit failed in any window; R5 did not recur (5.4 ms). A 5× spike in browser-shaped traffic passed at 0.34 % failed
+with nobody at cap and 93 % of its 15,508 views from the page cache.
+
+- **R6 — inventory is the next wall under API-shaped spikes**: 97 % of its quarter vCPU, 1.2–1.4k pool timeouts on 3
+  connections, from the shoppers' direct `availability` calls. Not in browser traffic (17 %). Fixes: a seconds-long
+  availability cache keyed by store and sku (cvhome), a pool of its own and the medium size (cvhome-platform).
+- **R7 — the load generator is the ceiling** in the API-shaped spikes: the host's idle CPU bottomed at 0.3–0.7 %.
+  Quote those runs' peak-window latencies with that caveat; the browser-shaped spike is the honest one.
+
 ## Deviations as built
 
 ### cvhome (`fix/load-bottlenecks`, 17 commits: the 15 phases, one inventory fix, one test fix)
