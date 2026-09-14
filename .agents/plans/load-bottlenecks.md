@@ -215,6 +215,25 @@ with nobody at cap and 93 % of its 15,508 views from the page cache.
 - **R7 — the load generator is the ceiling** in the API-shaped spikes: the host's idle CPU bottomed at 0.3–0.7 %.
   Quote those runs' peak-window latencies with that caveat; the browser-shaped spike is the honest one.
 
+**One mix spike alone, and its root cause** (2026-09-15, Grafana emptied before it; the report *Production Mix
+Spike*; `docs/baseline.md` → *The production mix alone*): every error in the run was one chain — catalog at 99 %
+of its CPU for the spike minute, 68 requests queued on its 8 connections; its `detailed-products` read the largest
+cost (2,181 calls, 3,388 s of server time); checkout's 791 timeouts waiting on it; 424 × 502 carts; 74 % of
+purchases failed. Two phases followed on cvhome's PR:
+
+21. **A cart-line read in catalog** — `GET /api/v1/cart-lines`: what a line renders and nothing more, from a per-sku
+    Caffeine entry (`CachedCartLines`, one `getAll` per call, keyed by store, sku and language, dropped with the
+    store's other keys). *(R8: the full product per line, five-way fetch join, merchant-store lookup each)*
+22. **A cart line remembers its product in checkout** — a read or a removal prices from the line's snapshot and asks
+    inventory alone; an add asks the catalogue about the one sku it adds; a snapshot older than a day is refreshed.
+    *(R8)*
+
+The same run again on those two: total failed 6.5 → 2.8 %, storefront 7.1 → 2.9 %; catalog 74 % peak, never at its
+cap, 0 × 5xx (was 1,826), `cart-lines` 1,054 calls and `detailed-products` 0. **R9 — checkout is the wall behind it:**
+15 ms of Fargate CPU a request on a quarter vCPU, 60 s at its cap, 955 × 5xx, purchases 78 % failed because more
+carts now reach it. Fixes: the medium size for checkout (cvhome-platform), then its CPU (the inventory HTTP call on
+every read, placement's 15 statements, the outbox on its 3 connections).
+
 ## Deviations as built
 
 ### cvhome (`fix/load-bottlenecks`, 17 commits: the 15 phases, one inventory fix, one test fix)
@@ -267,6 +286,9 @@ with nobody at cap and 93 % of its 15,508 views from the page cache.
   reads `writeHead`'s flat array form only: Node accepts no other.
 - **Phase 20:** the facade is a client component in `libs/ui` used by the shared `compose.tsx`; the eight themes'
   `VideoFrame` boxes are unchanged. Vimeo gets no still (its poster needs a script).
+- **Phases 21–22** ran on the load stack (the one mix spike, before and after); a `detailed-products` caller other
+  than checkout would still get the full shape. The cart line's snapshot lives in seven nullable columns, added to
+  an old database by `alter table … add column if not exists`.
 - **Not verified on a stack:** phases 16–20 are proven by unit and integration tests (the sequences by every service's
   integration suite booting under `validate`); the facade, the per-store eviction on a running stack and the cache's
   stale refresh under spg are `[unit only]` / `[not verified]` in the QA files until the next lcl or load-stack pass.
