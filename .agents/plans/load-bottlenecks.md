@@ -121,6 +121,30 @@ Paths are relative to `cvhome/`. Every phase runs the touched modules' `test` an
 15. **landing-ui serves anonymous pages from a cache** — `start.mjs` as decided above; a unit-tested module next to it
     (key, admission rules, TTL, SWR, size bound), headers `x-storefront-cache: hit|miss|stale`. *(finding 1)*
 
+The re-run (*Where cvhome Breaks Now*, `docs/baseline.md` → *Heavy spikes again*, 2026-09-14) and a review of phases
+1–15 added five phases to the same PR, easiest first:
+
+16. **Postgres sequences replace the table generators** — the 32 entities of catalog, checkout, content, inventory and
+    payment take a `@SequenceGenerator` on `<table>_seq` (`increment by 50`, pooled-lo); `schema.sql` declares the
+    sequences and drops `sm_sequencer`; `init-sql/data-sequences.sql` runs last in every profile and sets each sequence
+    to `max(id) + 1`, never backwards. *(finding R1: the table generator's second connection deadlocked checkout's pool
+    of 3 at three concurrent carts)*
+17. **Per-store cache eviction, and the listing and search cached** — every storefront read is keyed
+    `StoreScopedKey(store, arguments)`; `EntityCommitCacheEviction` resolves the written entity's store
+    (`CatalogEntityStore`, `ContentEntityStore`) and drops that store's keys; collection events evict on Hibernate's
+    after-completion callback; catalog caches `/api/v2/products` and `/products/search` for 60 s and keys suggest by the
+    normalised text; the search indexer evicts the store after every refresh. *(findings R2, R3; review: eviction at
+    flush outside a Spring transaction, post-commit handling for every entity, the index refresh)*
+18. **Checkout reads the store's currency outside the placement transaction** — and the integration tests' merchant
+    stub records a call inside one. *(review: a peer call still held a connection once the STORE cache expired)*
+19. **The page cache's rules** — a degraded render (`orUndefined` after an aborted or timed-out read) and an HTML body
+    short of `</html>` are never kept; stale pages are refreshed by the cache's own loopback request; shared renders wait
+    and are kept alive while a waiter is there; RSC requests bypass; `writeHead`'s array form is read; a throwing
+    listener answers 500; `apiFetch` attaches the signal and budget to GET only and releases its timer. *(review of
+    phase 15)*
+20. **A video facade** — a video section renders a still and a play button and loads the player on the press.
+    *(finding R4: every home-page browser failure was the YouTube embed's `load`)*
+
 QA: each phase adds or updates a case in the owning service's `qa/<svc>-qa.md` (catalog, checkout, content,
 inventory, landing-ui), tagged `[verified]` with what verified it.
 
@@ -144,7 +168,7 @@ Gates: `terraform fmt -recursive -check`, `terraform validate` per root/module, 
 
 ### load-testing — after the person builds the images
 
-The report's own branch, `docs/heavy-spike` (two commits, not yet pushed), goes first. Then on `fix/load-bottlenecks`:
+The report's own branch, `docs/heavy-spike`, is folded into `fix/load-bottlenecks` (one PR, its commits first). Then:
 
 1. **Sizes and pools follow the platform.** Re-run `scripts/sync-fargate-sizes.mjs` against cvhome-platform
    `fix/load-bottlenecks` (uaa moves to `auth`, prod `ssr` to 1 vCPU), and teach it a service's own `db_pool_size`, so
@@ -154,6 +178,28 @@ The report's own branch, `docs/heavy-spike` (two commits, not yet pushed), goes 
    cache). Add *After the fixes* beside *Heavy spikes* in `docs/baseline.md`: CPU per container against its cap, SQL per
    route, pools, and what shoppers saw. Read `x-storefront-cache` in the storefront journeys: a browse journey that
    repeats pages will mostly hit, so say which numbers are cache hits.
+3. **The spike's shoppers send what a browser sends.** `browser-storefront-spike` takes `SHOPPER_TRAFFIC=browser`
+   (default: the document, and on three home visits in ten what the search box fetches) or `api` (every read landing-ui
+   makes, as before), and `SPIKE_MODEL=rate` for an arrival-rate spike; a Chromium visit ends on `domcontentloaded` and
+   the page's own assertion, not a third party's `load`; every page view counts `storefront_page_cache{state}`.
+   *(findings R2, R4)*
+
+## The re-run's findings (2026-09-14, on the images built from this branch)
+
+The storefront wall is gone (landing-ui 70 → 7.4 ms of CPU a page, never at its cap; the home page's median 42 s → 3
+ms at 5×; recovery p95 32.7 s → 121 ms; orders in the mix 13 → 50). What was left:
+
+- **R1 — checkout's id generator deadlocked its pool.** 76 of 91 cart creations failed after a restart: the
+  `TableGenerator` refills on a second pooled connection while the cart's transaction holds the first. → phase 16.
+- **R2 — catalog is the wall, from the journeys' direct calls.** Pages got fast, the closed-model shoppers looped 3.5×
+  faster, and their direct catalog API calls were 87 % of catalog's load; catalog at 99 % of its cap answered 3,851
+  requests with a 500 after Hikari's 3 s. The listing and the search were the reads not cached. → phase 17,
+  load-testing 3.
+- **R3 — every write cleared every store's caches**, 10–25 points of hit ratio in the mix. → phase 17.
+- **R4 — every home-page browser failure was the YouTube embed**: `load` 13–26 s after the document with the stack
+  idle. → phase 20, load-testing 3.
+- **R5 — throttling stalls**: 66–101 ms before the first query in 5 of 12 sampled requests on the 0.1125- and
+  0.225-core caps (`detailed-products` 7 → 77 ms). Nothing to fix; to watch on Fargate.
 
 ## Deviations as built
 
@@ -194,6 +240,22 @@ The report's own branch, `docs/heavy-spike` (two commits, not yet pushed), goes 
 - **Phase 14:** `start.mjs` wraps the listener of the `http.Server` Next's `startServer` creates (one synchronous
   `createServer` call, patched for that call only), rather than replacing `startServer`. Writes get no time budget.
 - **QA** cases went into each service's QA file in one closing commit, after the lcl run, not per phase.
+- **Phase 16:** the content schema already declared a `content_seq` nobody used; it is the one Content takes.
+  `sales_order_seq` starts at 1000, as its sequencer row did. `data-sequences.sql` guards against a second task's
+  start: a sequence is set to the greater of `max(id) + 1` and its own next value.
+- **Phase 17:** the eviction listener could not stay a whole-cache clear with a store filter bolted on: the keys had to
+  carry the store apart from the other arguments (`StoreScopedKey`), which also let the listener refuse a cache it
+  cannot scope. The store resolvers are two switch classes beside the entities rather than an interface on 34 of
+  them. The suggest normalisation lives in the API (`suggestKey`, `suggestLimit`), since a cached method calling
+  another on the same bean bypasses the proxy.
+- **Phase 19:** the stale refresh is a loopback HTTP request to the server's own port carrying the store headers,
+  not a synthetic `ServerResponse`; the shared-render fall-through after 10 s is gone, waiters wait. `page-cache.mjs`
+  reads `writeHead`'s flat array form only: Node accepts no other.
+- **Phase 20:** the facade is a client component in `libs/ui` used by the shared `compose.tsx`; the eight themes'
+  `VideoFrame` boxes are unchanged. Vimeo gets no still (its poster needs a script).
+- **Not verified on a stack:** phases 16–20 are proven by unit and integration tests (the sequences by every service's
+  integration suite booting under `validate`); the facade, the per-store eviction on a running stack and the cache's
+  stale refresh under spg are `[unit only]` / `[not verified]` in the QA files until the next lcl or load-stack pass.
 
 ### cvhome-platform (`fix/load-bottlenecks`, 5 commits)
 
@@ -205,7 +267,20 @@ The report's own branch, `docs/heavy-spike` (two commits, not yet pushed), goes 
   prod pod).
 - **Follow-up for load-testing:** `scripts/sync-fargate-sizes.mjs` must be re-run after this merges (uaa → `auth`,
   prod `ssr`), and it copies only the flavour-wide pool, so the load stack keeps catalog at 3 until it learns
-  `db_pool_size`.
+  `db_pool_size`. *(Done in load-testing `fix/load-bottlenecks`: the copy carries a service's own pool, `stack.sh`
+  exports one per JVM, and the compose sets each service's Hikari pool from it.)*
+
+### load-testing (`fix/load-bottlenecks`, the two baseline commits and the stack's log levels first)
+
+- `docs/baseline.md` carries both passes (*Heavy spikes*, *Heavy spikes again*) with the report's numbers.
+- `SHOPPER_TRAFFIC` defaults to `browser` for the browser spike only; `storefront-browse` keeps sending every read,
+  that is what it measures. `SPIKE_MODEL` defaults to `vus`, what the numbers above were made with; the perf-suite
+  is unchanged.
+- The per-service pool moved out of the compose's `SPRING_APPLICATION_JSON` blob (which beats an environment variable)
+  into one `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` per JVM, `LOAD_POOL_SIZE_<SERVICE>` from `stack.sh`.
+- Verified: `make inspect`, `make selftest` against the running load stack (main's images: every page view counted
+  `none`), `k6 inspect` of both spike models, `stack/stack.sh sizes`, a smoke of the browser spike; the stack was not
+  restarted with the new compose (a peer session shares it).
 
 ## Verification
 
