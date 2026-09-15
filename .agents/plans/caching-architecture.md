@@ -263,7 +263,23 @@ billing `StoreEntitlements` / `EntitlementServiceImpl`, `CachingSecretCryptoProv
   Without it the shared domain's integration coverage fell from 69% to 58%: the library's lines are exercised by a
   service's integration tests only once a service adopts it.
 
+- **PR 2, the merchant client phase moved here from PR 3:** with `:store-commons:cache` on every consumer's classpath
+  through `merchant-external-api`, the three `@Cacheable("STORE")` copies would have named a region nobody declared
+  and stopped checkout and payment at start-up; the one decorator (`CachedMerchantStoreReads`) and the removal of
+  `spring.cache` ship with the catalog/content PR.
+- **PR 2, the registry merges every `CacheRegions` bean:** a library a service uses (the merchant client) declares
+  the regions of its own reads as a bean of its own, so a consumer registers nothing.
+- **PR 2, `QueryKey` and `CacheKey.ABSENT`:** a criteria object rides in the key as its canonical text's hash, and
+  an optional argument left null keys as `-`, both in the library.
+- **PR 3, no `checkout.country` region:** the country list is an ISO list computed once per language and held for
+  the task's life; nothing writes it and no store owns it, so a region would cache a cache.
+- **PR 3, merchant's server side is three regions** (`merchant.store` for the peers' read, `merchant.store-by-language`
+  for the storefront's, `merchant.languages`), all dropped by a save of the store.
+
 ## Status
 
 - cvhome PR 1 (`feat/cache-library`): **cvhome #365**, eight commits, verify green (shared integration 71.5%).
-- cvhome PRs 2–4, load-testing docs: not started.
+- cvhome PR 2 (`feat/cache-catalog-content`, stacked on #365): **cvhome #366**, six commits, verify green.
+- load-testing docs: **load-testing #16**, verify green.
+- cvhome PR 3 (`feat/cache-services`, stacked on #366): inventory, payment and merchant built; integration suites running.
+- cvhome PR 4 (events): not started.
