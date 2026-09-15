@@ -294,7 +294,6 @@ billing `StoreEntitlements` / `EntitlementServiceImpl`, `CachingSecretCryptoProv
 - cvhome PR 2 (`feat/cache-catalog-content`, stacked on #365): **cvhome #366**, six commits, verify green.
 - load-testing docs: **load-testing #16**, verify green.
 - cvhome PR 3 (`feat/cache-services`, stacked on #366): **cvhome #367**, four commits, verify green.
-- cvhome PR 4 (`feat/cache-events`, stacked on #367): three commits built, integration suites green, full verify
-  running; PR number pending.
+- cvhome PR 4 (`feat/cache-events`, stacked on #367): **cvhome #368**, three commits, verify green.
 - Next, in order: merge #365 → retarget #366 to main → merge → retarget #367 → merge → retarget PR 4 → merge; then
   a transport (HTTP fan-out or a broker) and the consumers' `onEvent` mappings, and the Redis provider module.
