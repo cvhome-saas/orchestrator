@@ -265,5 +265,5 @@ billing `StoreEntitlements` / `EntitlementServiceImpl`, `CachingSecretCryptoProv
 
 ## Status
 
-- cvhome PR 1 (`feat/cache-library`): phases 1–7 built; verify pending.
+- cvhome PR 1 (`feat/cache-library`): **cvhome #365**, eight commits, verify green (shared integration 71.5%).
 - cvhome PRs 2–4, load-testing docs: not started.
