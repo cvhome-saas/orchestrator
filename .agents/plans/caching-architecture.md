@@ -295,5 +295,14 @@ billing `StoreEntitlements` / `EntitlementServiceImpl`, `CachingSecretCryptoProv
 - load-testing docs: **load-testing #16**, verify green.
 - cvhome PR 3 (`feat/cache-services`, stacked on #366): **cvhome #367**, four commits, verify green.
 - cvhome PR 4 (`feat/cache-events`, stacked on #367): **cvhome #368**, three commits, verify green.
+- **Spike on the whole stack (2026-09-15, `tmp/cache-all` = main + #365–#368, report
+  <https://claude.ai/code/artifact/fff9b136-2e01-4eec-abe6-83cd72b12386>):** the first run refused 151 cart calls
+  with 422 `PRODUCT_NOT_PURCHASABLE` on skus in stock. `CaffeineRegionCache.getAll` stamped rows loaded during a
+  store eviction with the new version, so Caffeine returned nothing for the keys asked and checkout took the sku as
+  unknown. Fixed on `feat/cache-library` (`fix(cache): a bulk load that crosses a store eviction keeps the rows it
+  loaded`, regression test) and merged up the stack; the rerun had zero 422s, catalog 725 × 5xx against v5's 1,301,
+  checkout 800 against 845, 69 orders against 62. The headline failure rate (9.9% against v5's 6.1%) is landing-ui
+  at its cap for 90 s: v5 ran with the page-cache branch, which is not on main. The cache events flowed on the stack
+  (427 ProductChanged, 216 StockChanged, 112 PriceChanged, 1 StoreChanged, all drained).
 - Next, in order: merge #365 → retarget #366 to main → merge → retarget #367 → merge → retarget PR 4 → merge; then
   a transport (HTTP fan-out or a broker) and the consumers' `onEvent` mappings, and the Redis provider module.
