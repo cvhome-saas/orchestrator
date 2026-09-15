@@ -234,6 +234,16 @@ cap, 0 × 5xx (was 1,826), `cart-lines` 1,054 calls and `detailed-products` 0. *
 carts now reach it. Fixes: the medium size for checkout (cvhome-platform), then its CPU (the inventory HTTP call on
 every read, placement's 15 statements, the outbox on its 3 connections).
 
+The rebuilt images, a fresh database and a three-minute warm-up (2026-09-15, one mix spike): 5.3 % failed, checkout
+94 % of its quarter vCPU for 45 s, 987 × 5xx, 12.5 ms of Fargate CPU a request; the same spike at 75 s of JVM age
+read 7.8 % (catalog back at 99 %: the JIT and empty caches, not the code). One more phase on cvhome's PR:
+
+23. **Inventory's price and stock per sku, cached in checkout** — `CachedSkuInventory` (`INVENTORY_SKU`, one Caffeine
+    entry per store and sku, five seconds, one `getAll` per cart read): a read or a removal prices from it; an add
+    checks its sku against inventory live; a placement prices live and then forgets its skus. No event reaches checkout
+    from inventory, so the entries expire rather than being evicted. *(R9: the inventory HTTP call on every cart read)*
+
+
 ## Deviations as built
 
 ### cvhome (`fix/load-bottlenecks`, 17 commits: the 15 phases, one inventory fix, one test fix)
