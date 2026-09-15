@@ -258,6 +258,11 @@ billing `StoreEntitlements` / `EntitlementServiceImpl`, `CachingSecretCryptoProv
 - **PR 1, the meter binder** is a `CacheMeterBinderProvider` for the library's Spring cache type, so Boot's own
   `CacheMetricsAutoConfiguration` binds every region; no binder of our own is registered by hand.
 
+- **PR 1, an integration test in the library:** the module applies `java-integration-test-conventions` (a library may,
+  when it owns real infrastructure) and `CacheIntegrationTest` runs the auto-configuration on a Testcontainers Postgres.
+  Without it the shared domain's integration coverage fell from 69% to 58%: the library's lines are exercised by a
+  service's integration tests only once a service adopts it.
+
 ## Status
 
 - cvhome PR 1 (`feat/cache-library`): phases 1–7 built; verify pending.
