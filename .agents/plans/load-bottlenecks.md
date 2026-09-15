@@ -1,8 +1,20 @@
 # Where cvhome breaks — the nine bottlenecks of the heavy spikes, fixed
 
 This is the one plan for this change, in every repo. Every work item is one PR in one repo, on the same branch name,
-`fix/load-bottlenecks`. In cvhome, each phase is one commit on one PR, easiest first, so any one fix can be reverted
-alone. QA cases live in each service's `qa/<svc>-qa.md`, never here.
+`fix/load-bottlenecks`. In cvhome, each phase is one commit, easiest first, so any one fix can be reverted alone. QA
+cases live in each service's `qa/<svc>-qa.md`, never here.
+
+**cvhome ships as four PRs, not one** (2026-09-15, on request: the two new mechanisms may be revisited and are kept
+apart from the fixes). cvhome #359, the single PR, is closed unmerged; its branch stays for reference.
+
+| PR | branch | base | phases |
+|---|---|---|---|
+| cvhome #362 | `perf/landing-ui-fixes` | `main` | 14 (the abort budget), 20 (the video facade) |
+| cvhome #363 | `perf/landing-ui-page-cache` | #362 | 15, 19 (the page cache and its rules) |
+| cvhome #361 | `perf/java-load-fixes` | `main` | 1–7, 9–12, 16, 18, 21 (the cart-line read, uncached), 22 |
+| cvhome #364 | `perf/storefront-caches` | #361 | 8, 13, 17, 21's per-sku cache, 23 (`EntityCommitCacheEviction`, `StoreScopedKey`, the cache managers) |
+
+A stacked PR is retargeted to `main` once its base merges. cvhome-platform #12 and load-testing #15 are unchanged.
 
 The findings are the load-test report *Where cvhome Breaks* (artifact
 `https://claude.ai/code/artifact/6a901437-b6d9-4b55-b186-a360eff4d46b`, 2026-09-14, cvhome `main` at `c0f7ea358`),
@@ -63,7 +75,7 @@ Order: cvhome and cvhome-platform are independent and run in parallel (the platf
 no new env var the app does not already take). Then the person builds the load stack's images from cvhome
 `fix/load-bottlenecks`, and load-testing re-measures.
 
-### cvhome — one PR, `fix/load-bottlenecks`, one commit per phase
+### cvhome — one commit per phase, in the four PRs of the table above (originally one PR, `fix/load-bottlenecks`)
 
 Paths are relative to `cvhome/`. Every phase runs the touched modules' `test` and `integrationTest`;
 `extra/scripts/verify-before-push.sh` runs once on the final tree.
