@@ -275,11 +275,26 @@ billing `StoreEntitlements` / `EntitlementServiceImpl`, `CachingSecretCryptoProv
   the task's life; nothing writes it and no store owns it, so a region would cache a cache.
 - **PR 3, merchant's server side is three regions** (`merchant.store` for the peers' read, `merchant.store-by-language`
   for the storefront's, `merchant.languages`), all dropped by a save of the store.
+- **PR 4, `ContentChanged` carries the content kind** (`PAGE`, `POST`, …), not an item id: content is read as a
+  whole, and the kind is what a consumer could narrow on.
+- **PR 4, `VariantChanged` and `CategoryChanged` are raised by nobody yet:** the family is complete for a read keyed
+  by variant or category; today a category save evicts through its entity rule and no other service caches one.
+- **PR 4, a managed row is `save()`d for its events to leave:** Spring Data publishes on `save`, not on flush, so
+  the reservation paths save the inventory rows they decrement. Every event costs the outbox an insert and a select;
+  a bulk upsert of N skus writes 2N rows, and the bulk-upsert statement test leaves the outbox's reads out.
+- **PR 4, `EvictionRules.onEvents()`** starts the rules of a service with no tables of its own (a consumer mapping
+  foreign events); the `EvictionRules` default bean lives outside the Hibernate-only configuration so the applier
+  exists without Hibernate.
+- **PR 4, consumers map nothing yet:** `merchant.store-client` everywhere and `catalog.cart-line` in checkout keep
+  their ttl until a transport carries `StoreChanged` and `StockChanged`; the mapping is one `onEvent` line then.
 
 ## Status
 
 - cvhome PR 1 (`feat/cache-library`): **cvhome #365**, eight commits, verify green (shared integration 71.5%).
 - cvhome PR 2 (`feat/cache-catalog-content`, stacked on #365): **cvhome #366**, six commits, verify green.
 - load-testing docs: **load-testing #16**, verify green.
-- cvhome PR 3 (`feat/cache-services`, stacked on #366): inventory, payment and merchant built; integration suites running.
-- cvhome PR 4 (events): not started.
+- cvhome PR 3 (`feat/cache-services`, stacked on #366): **cvhome #367**, four commits, verify green.
+- cvhome PR 4 (`feat/cache-events`, stacked on #367): three commits built, integration suites green, full verify
+  running; PR number pending.
+- Next, in order: merge #365 → retarget #366 to main → merge → retarget #367 → merge → retarget PR 4 → merge; then
+  a transport (HTTP fan-out or a broker) and the consumers' `onEvent` mappings, and the Redis provider module.
