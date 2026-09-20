@@ -23,8 +23,10 @@ bootstrap → CodeBuild `1-prereq` → `2-images` → `3-apply`); local run with
 
 ## Decisions
 
-- **AWS screenshots come from the existing dev environment.** No fresh bootstrap; the Launch Stack and
-  parameter steps are documented in prose with the legacy shots where still accurate.
+- **Everything AWS is one phase, and it is the last one.** No fresh bootstrap: the captures come from the
+  existing **dev** environment. The captures, the six legacy images and the check of the AWS pages against
+  the live console all happen together, in one sitting, once a person has signed in. Every other phase can
+  be written, verified and reviewed without an account, so nothing else waits on one.
 - **`assets/fast-run` is retired.** lcl is the only documented local path; the script exits with a pointer.
 - **Three repos are fixed**, not one: the site, the org profile, and the cvhome skill references the site is
   written from (`.claude/skills/project-structure/` is canonical at v3.3; the `.agents/skills` mirror lags in
@@ -39,12 +41,14 @@ bootstrap → CodeBuild `1-prereq` → `2-images` → `3-apply`); local run with
 | # | Repo | Branch | Deliverable | Gate | Depends on |
 |---|---|---|---|---|---|
 | 1 | `cvhome` | `docs/architecture-rewrite` (worktree) | six stale statements fixed in `.claude/skills/project-structure/references/{gateways-and-local-domains,store-pod,store-core,multi-tenancy,frontends}.md`, SKILL.md 3.4, `.agents` mirror resynced | `extra/scripts/verify-before-push.sh` | — |
-| 2 | `cvhome-saas.github.io` | same (worktree) | 11 commits: tooling, information architecture, C4 L1/L2, L3, deployment views, development, guides, operations, guide+home, lcl screenshots, AWS screenshots. Phases in that repo's `.agents/plans/architecture-rewrite.md` | `scripts/verify.sh` (+ new `check-images.sh`), `qa/site-qa.md` | 1 (content) |
+| 2 | `cvhome-saas.github.io` | same (worktree) | 12 commits: tooling, information architecture, C4 L1/L2, L3, deployment views, development, guides, operations, guide+home, lcl screenshots, the plan as built. Phases in that repo's `.agents/plans/architecture-rewrite.md` | `scripts/verify.sh` (+ new `check-images.sh`), `qa/site-qa.md` | 1 (content) |
+| 6 | `cvhome-saas.github.io` | `docs/aws-captures` | **The AWS phase**, its own PR: thirteen console captures into the slots already in the pages, the six `legacy-*` images replaced or recaptioned, the five AWS pages checked against the live dev environment, the QA cases they earn | `scripts/verify.sh`, `qa/site-qa.md` | 2 merged; a signed-in console |
 | 3 | `dot-github` | same | `profile/README.md`: pitch, start-here links, repo table from `repos.yaml`; `qa/profile-qa.md` | `scripts/verify.sh` | 2 merged (links) |
 | 4 | `assets` | same | `fast-run/fast-run.sh` prints the retirement notice and exits 1; README banner | `scripts/verify.sh` | — |
 | 5 | orchestrator | same | this plan; after merges: `known-drift.md` and `repo-map.md` entries for the site and assets | — | 2, 4 merged |
 
-Order: 1 → 2 → (3 ∥ 4) → 5. PRs are opened, never merged, unless told.
+Order: 1 → 2 → (3 ∥ 4) → 5 → 6. PRs are opened, never merged, unless told. Item 6 is the only one that
+needs an AWS account and is deliberately held until every other repo has landed.
 
 ## Screenshot procedure
 
@@ -54,12 +58,36 @@ Order: 1 → 2 → (3 ∥ 4) → 5. PRs are opened, never merged, unless told.
 - **lcl**: the stack is shared across sessions — check `lcl status` for an owner first. `lcl start -d`,
   test-stores logins from cvhome `references/qa-testing.md`. Console at http://gateway.com:8000, uaa admin at
   http://uaa.gateway.com:8001, storefront at http://org1-store1.spg-507f1f77.gateway.com.
-- **AWS**: the person signs in first; region eu-central-1. Secrets Manager and SSM are captured as lists only;
-  never "Retrieve secret value". Crop or blur the account id before `git add`; look at every file.
+- **AWS (work item 6, all of it in one sitting)**: the person signs in first; region `eu-central-1`, except
+  the CloudFront certificate in `us-east-1`. Thirteen captures: the bootstrap stack's Outputs tab; the seven
+  CodeBuild projects and the tail of a succeeded `3-apply` log; the ECS cluster list, the core services and
+  one pod's services; the RDS instances; the hosted zone's records; the regional certificate; a pod's
+  CloudFront distribution; Secrets Manager and Parameter Store as **names only**; the CloudWatch dashboard.
+  Never open a secret's value tab. Crop or blur the account identifier before `git add`; look at every file.
+  While the console is open, confirm the CloudFormation parameter list, the stack outputs, the CodeBuild
+  project names, the log group naming and the dashboard sections against what the pages claim, and fix what
+  the Terraform implied but the account does not show.
 
 ## Deviations, as built
-_Filled in while implementing._
+
+- **The AWS work became its own work item (6) and its own PR**, rather than the last two commits of the site
+  PR. Grouping it means the console is opened once, and the twelve commits that need no account could be
+  reviewed without waiting.
+- **Four product screenshot slots were dropped** rather than filled: the pods, platform and identity admin
+  screens need a platform-administrator session that would not complete, and the seeded stores carry no
+  subscription, so the billing page is an empty state. The identity server's sign-in page was captured
+  instead.
+- **The cvhome work item became two commits**, the six corrections and then the mirror resync, because the
+  `.agents` copy was already 21 files behind and a single commit would have buried the fix.
+- **Two facts differed from the sources**: the storefront registers twelve themes, not thirteen, and the
+  gateway's pod list comes from `pod-registry`, not tenancy.
 
 ## Verification
-Per repo, the gate in the table. Site QA cases run in `npm run docs:dev` before the PR; the deployed-site case
-after merge. `scripts/impact.py` and `scripts/contract-check.py` before each PR (expected SAFE: docs only).
+
+Per repo, the gate in the table. `scripts/impact.py` and `scripts/contract-check.py` before each PR: SAFE,
+docs only, and the cvhome branch turns the standing `skill-map` warning into `OK`.
+
+Open: cvhome#370, cvhome-saas.github.io#5, .github#3, assets#3, orchestrator#8. The site's new pull-request
+build passed and correctly skipped the deploy job; cvhome's Checkstyle, unit and integration tests passed.
+Site QA cases are written and `[not verified]`: they are a browser pass through `npm run docs:dev` before
+merge, plus the deployed-site case after.
