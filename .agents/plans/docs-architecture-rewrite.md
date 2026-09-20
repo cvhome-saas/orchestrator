@@ -47,10 +47,11 @@ bootstrap → CodeBuild `1-prereq` → `2-images` → `3-apply`); local run with
 | 3 | `dot-github` | same | `profile/README.md`: pitch, start-here links, repo table from `repos.yaml`; `qa/profile-qa.md` | `scripts/verify.sh` | 2 merged (links) |
 | 4 | `assets` | same | `fast-run/fast-run.sh` prints the retirement notice and exits 1; README banner | `scripts/verify.sh` | — |
 | 5 | orchestrator | same | this plan; after merges: `known-drift.md` and `repo-map.md` entries for the site and assets | — | 2, 4 merged |
-| 6 | `cvhome-saas.github.io` | `docs/aws-captures` | **The AWS phase**, its own PR: thirteen console captures into the slots already in the pages, the six `legacy-*` images replaced or recaptioned, the five AWS pages checked against the live dev environment, the QA cases they earn | `scripts/verify.sh`, `qa/site-qa.md` | 2 merged; a signed-in console |
+| 6 | `cvhome-saas.github.io` | same branch as item 2 | **The AWS phase**, done: thirteen console captures plus two extra, five of the six `legacy-*` images replaced, the five AWS pages checked against a live dev environment, the QA case they earn | `scripts/verify.sh`, `qa/site-qa.md` | a signed-in console |
 
-Order: 1 → 2 → (3 ∥ 4) → 5 → 6. PRs are opened, never merged, unless told. Item 6 is the only one that
-needs an AWS account and is deliberately held until every other repo has landed.
+Order: 1 → 2 → (3 ∥ 4) → 5. PRs are opened, never merged, unless told. Item 6 needed an AWS account and was
+held for one; the account arrived before item 2 merged, so it landed as commits on the same branch rather
+than a separate pull request.
 
 ## Screenshot procedure
 
@@ -72,9 +73,13 @@ needs an AWS account and is deliberately held until every other repo has landed.
 
 ## Deviations, as built
 
-- **The AWS work became its own work item (6) and its own PR**, rather than the last two commits of the site
-  PR. Grouping it means the console is opened once, and the twelve commits that need no account could be
-  reviewed without waiting.
+- **The AWS work became its own work item (6)**, but landed on the same branch as item 2 rather than a
+  separate pull request, because the account arrived before that branch merged. Grouping it still paid off:
+  the console was opened once.
+- **The dev environment had been destroyed**, so the phase began by rebuilding it through the pipeline. That
+  rebuild doubles as evidence for the pipeline page, and it is the reason the phase took about an hour.
+- **Identifiers are replaced in the page before each capture**, not blacked out. The repository text was
+  grepped afterwards for the account number, the domain and the zone id: none present.
 - **Four product screenshot slots were dropped** rather than filled: the pods, platform and identity admin
   screens need a platform-administrator session that would not complete, and the seeded stores carry no
   subscription, so the billing page is an empty state. The identity server's sign-in page was captured
