@@ -62,10 +62,20 @@ anyway.
 - Workflow sets up buildx/QEMU but `build.sh` does a plain single-arch `docker build`.
 
 ## cvhome-saas.github.io
-- Entire deployment section and the architecture page describe an older layout: repos named
-  `cvhome-bootstrap` / `cvhome-ecs-fargate-infra` (infra is `cvhome-platform`), services `store-ui` /
-  `welcome-ui` / `merchant-ui` (now `console-ui`, `billing`, `pod-registry`, ...), ALB TLS termination (now
-  NLB passthrough to Caddy). Do not "fix a typo" here without deciding whether the page should exist.
+- **Rewritten 2026-09-20 and no longer drifting** (PR #5). The site is written from the code: C4 levels 1 to 3,
+  an AWS and a local deployment view, the three user journeys, local development with lcl, a configuration
+  reference, and the operator pages. Every page ends with the file it was written from; start a correction by
+  diffing that file. Screenshots come from a real lcl stack and a real dev environment.
+- What it no longer says, in case an old link or memory suggests otherwise: `cvhome-bootstrap`,
+  `cvhome-ecs-fargate-infra`, `store-ui`, `welcome-ui`, `merchant-ui`, ALB TLS termination for stores. The
+  five old sidebar URLs are one-line stubs pointing at their successors.
+- Two live-account corrections landed with it and are worth not re-breaking: the bootstrap stack's Outputs tab
+  shows ten entries, not eleven, because `StripeWebhookPath` is conditional on a `StripeKey`; and the apply
+  stage skips the Stripe webhook registration, with a line in its log, when no key was given.
+- **Production-only trap** (cost one broken deploy on 2026-09-20): VitePress rewrites image paths it finds in
+  markdown, but a path named anywhere else, such as `themeConfig.logo` or a `head` favicon tag, is served
+  exactly as written and must live under `docs/public`. The dev server hides this because Vite serves `docs/`
+  as the root. `scripts/check-images.sh` enforces both rules now.
 
 ## public-dkr
 - The matrix mirrors `saas-gateway:sha-8eed986` — the same sha `cvhome/store-pod/spg/Dockerfile` pins, so AWS
@@ -74,12 +84,15 @@ anyway.
 - README lists two images; the workflow matrix has nine. The matrix is the truth.
 
 ## assets
-- `fast-run/fast-run.sh` and its compose file describe the 1.0.x layout (`core-auth`, `store-ui`, `welcome-ui`,
-  `merchant-ui`, `order`, RabbitMQ, registry `public.ecr.aws/g0a5h6c1/1691275173`). None of that exists in
-  the current catalog; the docs site still links it as the quick start.
-- Its MinIO is `bitnami/minio:2025.4.22`, which Docker Hub no longer serves (404; Bitnami moved its catalog to a
-  frozen `bitnamilegacy/`, found 2026-09-12). Swapping the image would not revive fast-run; it needs rewriting
-  against the current catalog or retiring. `contract-check.py infra-images` WARNs on it until then.
+- **Retired 2026-09-20** (PR #3). `fast-run/fast-run.sh` now prints a notice and exits 1 before touching
+  `/etc/hosts` or Docker, pointing at the site's local development guide. lcl is the only documented local
+  path.
+- The compose file stays as the only record of the 1.0.x layout (`core-auth`, `store-ui`, `welcome-ui`,
+  `merchant-ui`, `order`, RabbitMQ, registry `public.ecr.aws/g0a5h6c1/1691275173`) and is not runnable: its
+  MinIO tag `bitnami/minio:2025.4.22` is gone from Docker Hub. `contract-check.py infra-images` still WARNs on
+  that tag; the warning is expected and is not a reason to "fix" a retired script.
+- The docs site never actually linked fast-run as its quick start, contrary to what this file used to say: the
+  only mention was unlinked bold text on a page that was not in the sidebar.
 
 ## e2e-testing
 - Playwright scaffold only: `tests/example.spec.ts` hits playwright.dev, no `baseURL`, no cvhome journey. The

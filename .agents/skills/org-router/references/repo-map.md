@@ -157,13 +157,22 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Al
 
 ## cvhome-saas.github.io — public docs site (kind: docs)
 
-- **What**: VitePress 1.6 + Mermaid, GitHub Pages via `.github/workflows/deploy.yml`. Pages under `docs/`:
-  `guide/{introduction,core-concepts,architecture-overview}.md`, `development/{local-setup,contributing}.md`,
-  `deployment/{overview,aws-deployment-guide,aws-architecture,cleanup-guide}.md`, `images/`, `digrams/` (sic).
-- **State**: last commit 2025-06, **actively wrong**: names `cvhome-bootstrap`/`cvhome-ecs-fargate-infra`
-  (now `cvhome-platform`), services `store-ui`/`welcome-ui`/`merchant-ui` (now `console-ui`, `billing`,
-  `pod-registry`, ...), ALB TLS termination (now NLB passthrough to Caddy). A rewrite should source from
-  `cvhome/.claude/skills/project-structure/` and `cvhome-platform/docs/infra-target-architecture.html`.
+- **What**: VitePress 1.6 + Mermaid, GitHub Pages via `.github/workflows/deploy.yml`, which builds on every
+  pull request and deploys only on push to `main`. Pages under `docs/`: `guide/{introduction,core-concepts,
+  repositories}.md`, `architecture/` (system context, containers, store-core, store-pod, gateway-routing,
+  edge-spg, authentication, tenancy-provisioning, deployment-aws, deployment-local), `guides/{merchant,
+  shopper,platform-admin}.md`, `development/{local-development,configuration,contributing}.md`,
+  `operations/{deployment-guide,pipeline,lifecycle,monitoring,releases}.md`; `images/{lcl,aws}/`,
+  `public/logo.png`. Five one-line stubs keep the old sidebar URLs alive.
+- **State**: rewritten 2026-09-20 (PR #5), **current**. Every page ends with the file it was written from, so
+  a correction starts by diffing that file; the sources are `cvhome/.claude/skills/project-structure/`,
+  `common-config.yml`, the spg `Caddyfile`, `lcl.yml`, and cvhome-platform's `README.md`, `services.yaml`,
+  `flavours.yaml`, `modules/*` and `bootstrap/bootstrap.yaml`. Diagrams are mermaid flowcharts styled as C4,
+  not the beta `C4Context` grammar.
+- **Gates**: `scripts/verify.sh` (whitespace, `npm ci`, `npm run docs:build`, `scripts/check-images.sh`) plus
+  `qa/site-qa.md`, nine cases, all run. Two traps it records: a mermaid syntax error does not fail the build,
+  it just breaks one picture, so the dev-server pass is the only catch; and an image path named outside
+  markdown is served verbatim and must live under `docs/public`, which only production reveals.
 
 ## ideation — product backlog (kind: ideas)
 
@@ -216,12 +225,13 @@ Paths are relative to the org root `/Volumes/Disk/IdeaProjects/cvhome-saas/`. Al
 
 ## assets — evaluation install (kind: docs)
 
-- **What**: `fast-run/fast-run.sh` (root-only: writes `/etc/hosts`, pulls images, runs the compose file) and
-  `fast-run/docker-compose.yml`, served raw from GitHub and linked by the docs site as the quick start.
-- **State**: describes the 1.0.x layout (`core-auth`, `store-ui`, `welcome-ui`, `merchant-ui`, `order`, RabbitMQ,
-  MinIO, registry `public.ecr.aws/g0a5h6c1/1691275173`) — hosts and services that the current catalog does not
-  have. A refresh must be generated from `common-config.yml`, `configure-domain.sh`, `docker-compose-lcl.yml`
-  and the images cvhome's public-ECR workflow publishes, and tested on a clean Docker host.
+- **What**: `fast-run/fast-run.sh`, retired 2026-09-20 (PR #3). It prints a notice and exits 1 before touching
+  `/etc/hosts` or Docker, pointing at the site's local development guide. `fast-run/docker-compose.yml` is
+  kept as the only record of the 1.0.x layout and is not runnable.
+- **State**: deliberately dead. lcl in a cvhome checkout is the only documented local path, so do not "repair"
+  the script or its compose file; `contract-check.py infra-images` WARNs on its MinIO tag, which is expected.
+  Reviving an evaluation install would mean publishing and maintaining fifteen public images for a path
+  `lcl start` already covers.
 
 ## dot-github — org profile (`.github` repo, kind: docs)
 
