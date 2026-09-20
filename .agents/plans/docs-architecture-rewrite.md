@@ -34,7 +34,9 @@ bootstrap → CodeBuild `1-prereq` → `2-images` → `3-apply`); local run with
 - **Mermaid flowcharts styled as C4**, not the beta `C4Context` grammar; one diagram per block; stroke-only
   `classDef` so dark mode stays legible. The stale `docs/digrams/aws-arch.drawio` is deleted, not redrawn.
 - **Stub pages** at the five old sidebar URLs (VitePress has no redirects); unreachable pages deleted.
-- **Screenshots are the last two commits**; every prose page carries an HTML comment where an image goes.
+- **Screenshots come after the prose.** Every page carries an HTML comment where an image belongs, so the
+  build and the image check stay green until a capture replaces it. The local captures are the last commit
+  of the site PR; the AWS captures are work item 6.
 
 ## Work items
 
@@ -42,10 +44,10 @@ bootstrap → CodeBuild `1-prereq` → `2-images` → `3-apply`); local run with
 |---|---|---|---|---|---|
 | 1 | `cvhome` | `docs/architecture-rewrite` (worktree) | six stale statements fixed in `.claude/skills/project-structure/references/{gateways-and-local-domains,store-pod,store-core,multi-tenancy,frontends}.md`, SKILL.md 3.4, `.agents` mirror resynced | `extra/scripts/verify-before-push.sh` | — |
 | 2 | `cvhome-saas.github.io` | same (worktree) | 12 commits: tooling, information architecture, C4 L1/L2, L3, deployment views, development, guides, operations, guide+home, lcl screenshots, the plan as built. Phases in that repo's `.agents/plans/architecture-rewrite.md` | `scripts/verify.sh` (+ new `check-images.sh`), `qa/site-qa.md` | 1 (content) |
-| 6 | `cvhome-saas.github.io` | `docs/aws-captures` | **The AWS phase**, its own PR: thirteen console captures into the slots already in the pages, the six `legacy-*` images replaced or recaptioned, the five AWS pages checked against the live dev environment, the QA cases they earn | `scripts/verify.sh`, `qa/site-qa.md` | 2 merged; a signed-in console |
 | 3 | `dot-github` | same | `profile/README.md`: pitch, start-here links, repo table from `repos.yaml`; `qa/profile-qa.md` | `scripts/verify.sh` | 2 merged (links) |
 | 4 | `assets` | same | `fast-run/fast-run.sh` prints the retirement notice and exits 1; README banner | `scripts/verify.sh` | — |
 | 5 | orchestrator | same | this plan; after merges: `known-drift.md` and `repo-map.md` entries for the site and assets | — | 2, 4 merged |
+| 6 | `cvhome-saas.github.io` | `docs/aws-captures` | **The AWS phase**, its own PR: thirteen console captures into the slots already in the pages, the six `legacy-*` images replaced or recaptioned, the five AWS pages checked against the live dev environment, the QA cases they earn | `scripts/verify.sh`, `qa/site-qa.md` | 2 merged; a signed-in console |
 
 Order: 1 → 2 → (3 ∥ 4) → 5 → 6. PRs are opened, never merged, unless told. Item 6 is the only one that
 needs an AWS account and is deliberately held until every other repo has landed.
